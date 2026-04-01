@@ -1188,9 +1188,9 @@ void drawSlideSummary() {
   drawHeader("SLIDE 1  CURRENT");
   const int cardW = M5.Display.width() - UI_MARGIN_X * 2;
   const int currentY = 92;
-  const int currentH = 326;
+  const int currentH = 308;
   const int changeY = 440;
-  const int changeH = 434;
+  const int changeH = 452;
   const int innerX = UI_MARGIN_X + 20;
   const int innerW = cardW - 40;
   const int colGap = 34;
@@ -1220,16 +1220,16 @@ void drawSlideSummary() {
   drawMetricWithIcon(ICON_PRESSURE, "PRES", formatFloat1(g_env4.pressure), "hPa", rightColX, 248, rightUnitX);
 
   drawCard(UI_MARGIN_X, changeY, cardW, changeH, "RECENT CHANGES");
-  drawChangeSummaryRow(ICON_PRESSURE, "PRESSURE", pArrow, 506);
-  drawChangeSummaryRow(ICON_HUMIDITY, "HUMIDITY", hArrow, 564);
-  drawChangeSummaryRow(ICON_LIGHT, "LIGHT", lightDisplay, 622);
-  M5.Display.drawLine(innerX, 694, UI_MARGIN_X + cardW - 20, 694, TFT_BLACK);
-  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), innerX, 718, &fonts::Font4);
+  drawChangeSummaryRow(ICON_PRESSURE, "PRESSURE", pArrow, 492);
+  drawChangeSummaryRow(ICON_HUMIDITY, "HUMIDITY", hArrow, 550);
+  drawChangeSummaryRow(ICON_LIGHT, "LIGHT", lightDisplay, 608);
+  M5.Display.drawLine(innerX, 680, UI_MARGIN_X + cardW - 20, 680, TFT_BLACK);
+  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), innerX, 712, &fonts::Font4);
   drawPatternSummaryRow(innerX, 754, "Now:", pArrow, hArrow, lArrow, lightActive, false);
-  drawPatternSummaryRow(innerX, 786, "Rain pattern:", pArrow, hArrow, lArrow, lightActive, true);
+  drawPatternSummaryRow(innerX, 794, "Rain pattern:", pArrow, hArrow, lArrow, lightActive, true);
   M5.Display.drawString(lightActive ? "Pressure down  Humidity up  Light down in daytime"
                                    : "At night, use pressure and humidity.",
-                        innerX + 76, 818, &fonts::Font2);
+                        innerX + 76, 836, &fonts::Font2);
 
   drawFooter();
 }
@@ -1251,16 +1251,16 @@ void drawSlideSignals() {
   drawSignalRow(ICON_HUMIDITY, "HUMIDITY", hArrow, normalizedHumidityTrend(), 262);
   drawSignalRow(ICON_LIGHT, "LIGHT", lightDisplay, lightActive ? normalizedLuxTrend() : 0.0f, 432);
 
-  drawCard(UI_MARGIN_X, 618, M5.Display.width() - UI_MARGIN_X * 2, 188, "INTERPRET");
+  drawCard(UI_MARGIN_X, 604, M5.Display.width() - UI_MARGIN_X * 2, 212, "INTERPRET");
   M5.Display.drawString("Check order: Pressure -> Humidity -> Light", UI_MARGIN_X + 18, 640, &fonts::Font2);
   M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), UI_MARGIN_X + 18, 666, &fonts::Font4);
   drawPatternSummaryRow(UI_MARGIN_X + 18, 696, "Now:", pArrow, hArrow, lArrow, lightActive, false);
-  drawPatternSummaryRow(UI_MARGIN_X + 18, 724, "Rain pattern:", pArrow, hArrow, lArrow, lightActive, true);
+  drawPatternSummaryRow(UI_MARGIN_X + 18, 732, "Rain pattern:", pArrow, hArrow, lArrow, lightActive, true);
   M5.Display.drawString(lightActive ? "Pressure down  Humidity up  Light down in daytime"
                                    : "At night, use pressure and humidity.",
-                        UI_MARGIN_X + 76, 752, &fonts::Font2);
-  M5.Display.drawString("What changed first?", UI_MARGIN_X + 18, 778, &fonts::Font2);
-  M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X - 34, 778, &fonts::Font2);
+                        UI_MARGIN_X + 76, 770, &fonts::Font2);
+  M5.Display.drawString("What changed first?", UI_MARGIN_X + 18, 794, &fonts::Font2);
+  M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X - 34, 794, &fonts::Font2);
 
   drawFooter();
 }
