@@ -147,6 +147,10 @@ PubSubClient mqttClient(wifiClient);
 
 uint8_t g_currentSlide = 0;
 uint8_t g_lastMainSlide = 0;
+uint32_t g_bootMs = 0;
+uint32_t g_liveDisplayTs = 0;
+uint8_t g_liveValidTimeCount = 0;
+bool g_displayTimeLocked = false;
 uint32_t g_lastSlideMs = 0;
 uint32_t g_lastRefreshMs = 0;
 uint32_t g_lastWifiAttemptMs = 0;
@@ -199,17 +203,24 @@ float safeLatestTs() {
   return 0;
 }
 
+void noteLiveDisplayTime(uint32_t ts, bool timeValid) {
+  if (!timeValid || ts <= 1700000000UL) return;
+  g_liveDisplayTs = ts;
+  if (g_liveValidTimeCount < 255) {
+    ++g_liveValidTimeCount;
+  }
+  if (!g_displayTimeLocked && (millis() - g_bootMs) >= 120000UL && g_liveValidTimeCount >= 2) {
+    g_displayTimeLocked = true;
+  }
+}
+
 bool hasValidDisplayTime() {
-  if (g_luxRaw.valid && g_luxRaw.time_valid && g_luxRaw.unix_time > 1700000000UL) return true;
-  if (g_luxMeta.valid && g_luxMeta.time_valid && g_luxMeta.unix_time > 1700000000UL) return true;
-  if (g_env4.valid && g_env4.time_valid && g_env4.ts > 1700000000UL) return true;
-  if (g_luxStatus.valid && g_luxStatus.time_valid && g_luxStatus.unix_time > 1700000000UL) return true;
-  return false;
+  return g_displayTimeLocked && g_liveDisplayTs > 1700000000UL;
 }
 
 String formatFooterTime() {
   if (!hasValidDisplayTime()) return "--:--";
-  return formatUnixTime((uint32_t)safeLatestTs());
+  return formatUnixTime(g_liveDisplayTs);
 }
 
 String formatBatteryStatus() {
@@ -446,6 +457,7 @@ void handleEnv4(const JsonDocument& doc) {
   if (g_env4.ts > 0 && !isnan(g_env4.pressure)) {
     g_envHist.push({g_env4.ts, g_env4.temperature, g_env4.humidity, g_env4.pressure});
   }
+  noteLiveDisplayTime(g_env4.ts, g_env4.time_valid);
 
   if (g_sdReady) {
     ensureLogDirs();
@@ -470,6 +482,7 @@ void handleLuxRaw(const JsonDocument& doc) {
   g_luxRaw.unix_time = doc["unix_time"] | 0;
   g_luxRaw.time_valid = doc["time_valid"] | false;
   g_luxRaw.valid = true;
+  noteLiveDisplayTime(g_luxRaw.unix_time, g_luxRaw.time_valid);
   g_needRedraw = true;
 }
 
@@ -490,6 +503,7 @@ void handleLuxMeta(const JsonDocument& doc) {
   if (g_luxMeta.unix_time > 0 && !isnan(g_luxMeta.lux)) {
     g_luxHist.push({g_luxMeta.unix_time, g_luxMeta.lux, g_luxMeta.avg, g_luxMeta.rate_pct});
   }
+  noteLiveDisplayTime(g_luxMeta.unix_time, g_luxMeta.time_valid);
 
   if (g_sdReady) {
     ensureLogDirs();
@@ -527,6 +541,7 @@ void handleLuxStatus(const JsonDocument& doc) {
   g_luxStatus.unix_time = doc["unix_time"] | 0;
   g_luxStatus.time_valid = doc["time_valid"] | false;
   g_luxStatus.valid = true;
+  noteLiveDisplayTime(g_luxStatus.unix_time, g_luxStatus.time_valid);
   g_needRedraw = true;
 }
 
@@ -1124,6 +1139,7 @@ void setup() {
   Serial.println("[SETUP] initial connect attempts done");
 
   g_needRedraw = true;
+  g_bootMs = millis();
   g_lastSlideMs = millis();
   g_lastRefreshMs = millis() - EPD_REFRESH_MS;
   g_lastStateSaveMs = millis();
