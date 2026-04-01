@@ -518,6 +518,17 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 }
 
 // ---------------------- drawing helpers ----------------------
+static constexpr int UI_MARGIN_X = 24;
+static constexpr int UI_HEADER_H = 46;
+static constexpr int UI_FOOTER_H = 34;
+static constexpr int UI_CONTENT_TOP = 68;
+static constexpr int UI_CONTENT_BOTTOM = 548;
+static constexpr int UI_COL_GAP = 24;
+static constexpr int UI_LEFT_COL_X = UI_MARGIN_X;
+static constexpr int UI_LEFT_COL_W = 336;
+static constexpr int UI_RIGHT_COL_X = UI_LEFT_COL_X + UI_LEFT_COL_W + UI_COL_GAP;
+static constexpr int UI_RIGHT_COL_W = 540 - UI_MARGIN_X - UI_RIGHT_COL_X;
+
 void drawHeader(const char* title) {
   M5.Display.fillScreen(TFT_WHITE);
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
@@ -537,9 +548,9 @@ void drawFooter() {
   String net = (WiFi.status() == WL_CONNECTED) ? "WIFI OK" : "WIFI NG";
   String mq = mqttClient.connected() ? "MQTT OK" : "MQTT NG";
 
-  M5.Display.drawLine(0, M5.Display.height() - 34, M5.Display.width(), M5.Display.height() - 34, TFT_BLACK);
-  M5.Display.drawString(ts, 16, M5.Display.height() - 28, &fonts::Font2);
-  M5.Display.drawRightString(net + "  " + mq, M5.Display.width() - 16, M5.Display.height() - 28, &fonts::Font2);
+  M5.Display.drawLine(0, M5.Display.height() - UI_FOOTER_H, M5.Display.width(), M5.Display.height() - UI_FOOTER_H, TFT_BLACK);
+  M5.Display.drawString(ts, UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
+  M5.Display.drawRightString(net + "  " + mq, M5.Display.width() - UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
 }
 
 void drawKeyValue(const char* label, const String& value, int x, int y, const lgfx::IFont* valueFont = &fonts::Font4) {
@@ -548,16 +559,71 @@ void drawKeyValue(const char* label, const String& value, int x, int y, const lg
   M5.Display.drawString(value, x, y + 18, valueFont);
 }
 
-void drawTrendBadge(const char* trend, int x, int y) {
-  int w = 150;
-  int h = 36;
+void drawMetricBlock(const char* label, const String& value, const String& unit, int x, int y, int unitDx = 110) {
+  M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
+  M5.Display.drawString(label, x, y, &fonts::Font2);
+  M5.Display.drawString(value, x, y + 16, &fonts::Font6);
+  if (unit.length() > 0) {
+    M5.Display.drawString(unit, x + unitDx, y + 34, &fonts::Font2);
+  }
+}
+
+void drawTextBlock(const char* label, const String& value, int x, int y, const lgfx::IFont* valueFont = &fonts::Font4) {
+  M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
+  M5.Display.drawString(label, x, y, &fonts::Font2);
+  M5.Display.drawString(value, x, y + 16, valueFont);
+}
+
+void drawTextPair(const char* label, const String& value, int x, int y, int valueX, const lgfx::IFont* valueFont = &fonts::Font4) {
+  M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
+  M5.Display.drawString(label, x, y, &fonts::Font2);
+  M5.Display.drawString(value, valueX, y, valueFont);
+}
+
+void drawSummaryRow(const char* label, const String& value, int x, int y) {
+  M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
+  M5.Display.drawString(label, x, y, &fonts::Font2);
+  M5.Display.drawRightString(value, x + UI_RIGHT_COL_W - 8, y, &fonts::Font4);
+}
+
+void drawCard(int x, int y, int w, int h, const char* title) {
   M5.Display.drawRect(x, y, w, h, TFT_BLACK);
-  M5.Display.drawCentreString(trend, x + w / 2, y + 8, &fonts::Font2);
+  M5.Display.drawString(title, x + 10, y + 10, &fonts::Font2);
+}
+
+const char* trendLabel(const char* trend) {
+  if (strcmp(trend, "rising_fast") == 0) return "RISING FAST";
+  if (strcmp(trend, "rising") == 0) return "RISING";
+  if (strcmp(trend, "falling_fast") == 0) return "FALLING FAST";
+  if (strcmp(trend, "falling") == 0) return "FALLING";
+  return "STABLE";
+}
+
+void drawTrendBadge(const char* trend, int x, int y) {
+  const int w = 206;
+  const int h = 46;
+  M5.Display.fillRect(x, y, w, h, TFT_BLACK);
+  M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+  M5.Display.drawCentreString(trendLabel(trend), x + w / 2, y + 12, &fonts::Font2);
+  M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
+}
+
+const char* signalGlyph(const String& signal) {
+  if (signal == "UP") return "ASCEND";
+  if (signal == "DOWN") return "DESCEND";
+  return "STEADY";
+}
+
+void drawSignalRow(const char* label, const String& signal, int y) {
+  M5.Display.drawString(label, UI_MARGIN_X + 10, y + 10, &fonts::Font4);
+  M5.Display.drawCentreString(signalGlyph(signal), 250, y + 4, &fonts::Font4);
+  M5.Display.drawRightString(signal, M5.Display.width() - UI_MARGIN_X - 16, y + 18, &fonts::Font2);
+  M5.Display.drawLine(UI_MARGIN_X, y + 70, M5.Display.width() - UI_MARGIN_X, y + 70, TFT_BLACK);
 }
 
 void drawSimpleLineGraphFloat(int x, int y, int w, int h, const float* vals, size_t n, const char* title, const char* unit) {
   M5.Display.drawRect(x, y, w, h, TFT_BLACK);
-  M5.Display.drawString(title, x + 8, y + 6, &fonts::Font2);
+  M5.Display.drawString(title, x + 6, y + 4, &fonts::Font2);
 
   if (n < 2) {
     M5.Display.drawCentreString("NO DATA", x + w / 2, y + h / 2 - 8, &fonts::Font2);
@@ -580,13 +646,13 @@ void drawSimpleLineGraphFloat(int x, int y, int w, int h, const float* vals, siz
   snprintf(bufMax, sizeof(bufMax), "%.1f %s", vMax, unit);
   snprintf(bufMin, sizeof(bufMin), "%.1f %s", vMin, unit);
 
-  M5.Display.drawRightString(bufMax, x + w - 8, y + 6, &fonts::Font2);
-  M5.Display.drawRightString(bufMin, x + w - 8, y + h - 22, &fonts::Font2);
+  M5.Display.drawRightString(bufMax, x + w - 6, y + 4, &fonts::Font2);
+  M5.Display.drawRightString(bufMin, x + w - 6, y + h - 20, &fonts::Font2);
 
   int gx = x + 10;
-  int gy = y + 28;
+  int gy = y + 24;
   int gw = w - 20;
-  int gh = h - 44;
+  int gh = h - 36;
 
   int prevX = -1;
   int prevY = -1;
@@ -604,17 +670,19 @@ void drawSimpleLineGraphFloat(int x, int y, int w, int h, const float* vals, siz
 
 void drawSlideSummary() {
   drawHeader("SLIDE 1  CURRENT");
-  drawKeyValue("TEMP", formatFloat1(g_env4.temperature) + " C", 24, 68, &fonts::Font6);
-  drawKeyValue("HUM", formatFloat1(g_env4.humidity) + " %", 24, 178, &fonts::Font6);
-  drawKeyValue("PRES", formatFloat1(g_env4.pressure) + " hPa", 24, 288, &fonts::Font4);
-  drawKeyValue("LUX", formatFloat1(g_luxRaw.lux), 24, 400, &fonts::Font6);
+  drawMetricBlock("TEMP", formatFloat1(g_env4.temperature), "C", UI_LEFT_COL_X + 8, 86);
+  drawMetricBlock("HUM", formatFloat1(g_env4.humidity), "%", UI_LEFT_COL_X + 8, 196);
+  drawTextBlock("PRES", formatFloat1(g_env4.pressure) + " hPa", UI_LEFT_COL_X + 8, 304, &fonts::Font4);
+  drawMetricBlock("LUX", formatFloat1(g_luxRaw.lux), "", UI_LEFT_COL_X + 8, 412, 0);
 
-  drawKeyValue("LUX AVG", formatFloat1(g_luxMeta.avg), 290, 68, &fonts::Font6);
-  drawKeyValue("LUX DELTA", formatFloat1(g_luxMeta.delta), 290, 178, &fonts::Font6);
-  drawKeyValue("LUX RATE", formatFloat2(g_luxMeta.rate_pct) + " %", 290, 288, &fonts::Font4);
-
-  M5.Display.drawString("TREND", 290, 400, &fonts::Font2);
-  drawTrendBadge(g_luxMeta.trend, 290, 426);
+  drawCard(UI_RIGHT_COL_X, 86, UI_RIGHT_COL_W, 412, "LIGHT TREND");
+  M5.Display.drawString("RATE", UI_RIGHT_COL_X + 14, 134, &fonts::Font2);
+  M5.Display.drawString(formatFloat2(g_luxMeta.rate_pct) + " %", UI_RIGHT_COL_X + 14, 158, &fonts::Font4);
+  M5.Display.drawString("NOW VS AVG", UI_RIGHT_COL_X + 14, 220, &fonts::Font2);
+  M5.Display.drawString(formatFloat1(g_luxMeta.delta), UI_RIGHT_COL_X + 14, 244, &fonts::Font4);
+  M5.Display.drawString("lux delta", UI_RIGHT_COL_X + 14, 278, &fonts::Font2);
+  M5.Display.drawString("TREND", UI_RIGHT_COL_X + 14, 346, &fonts::Font2);
+  drawTrendBadge(g_luxMeta.trend, UI_RIGHT_COL_X + 14, 372);
 
   drawFooter();
 }
@@ -626,17 +694,12 @@ void drawSlideSignals() {
   String hArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).humidity - g_envHist.at(0).humidity : NAN);
   String lArrow = arrowForDelta(g_luxMeta.delta);
 
-  M5.Display.drawString("PRESSURE", 40, 90, &fonts::Font4);
-  M5.Display.drawString(pArrow, 360, 90, &fonts::Font4);
+  drawSignalRow("PRESSURE", pArrow, 96);
+  drawSignalRow("HUMIDITY", hArrow, 214);
+  drawSignalRow("LIGHT", lArrow, 332);
 
-  M5.Display.drawString("HUMIDITY", 40, 210, &fonts::Font4);
-  M5.Display.drawString(hArrow, 360, 210, &fonts::Font4);
-
-  M5.Display.drawString("LIGHT", 40, 330, &fonts::Font4);
-  M5.Display.drawString(lArrow, 360, 330, &fonts::Font4);
-
-  M5.Display.drawString("QUESTION", 40, 470, &fonts::Font4);
-  M5.Display.drawString("RAIN COMING?", 220, 470, &fonts::Font4);
+  M5.Display.drawString("QUESTION", UI_MARGIN_X + 10, 470, &fonts::Font2);
+  M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X, 464, &fonts::Font4);
 
   drawFooter();
 }
@@ -659,9 +722,15 @@ void drawSlideGraphs() {
     luxVals[i] = g_luxHist.at(i).lux;
   }
 
-  drawSimpleLineGraphFloat(20, 60, 500, 230, pressureVals, envN, "PRESSURE", "hPa");
-  drawSimpleLineGraphFloat(20, 310, 240, 220, humidityVals, envN, "HUMIDITY", "%");
-  drawSimpleLineGraphFloat(280, 310, 240, 220, luxVals, luxN, "LUX", "");
+  drawSimpleLineGraphFloat(UI_LEFT_COL_X, 74, 328, 206, pressureVals, envN, "PRESSURE", "hPa");
+  drawSimpleLineGraphFloat(UI_LEFT_COL_X, 300, 156, 198, humidityVals, envN, "HUMIDITY", "%");
+  drawSimpleLineGraphFloat(196, 300, 156, 198, luxVals, luxN, "LUX", "");
+
+  drawCard(UI_RIGHT_COL_X, 74, UI_RIGHT_COL_W, 424, "NOW");
+  drawSummaryRow("PRES", formatFloat1(g_env4.pressure) + " hPa", UI_RIGHT_COL_X + 14, 128);
+  drawSummaryRow("HUM", formatFloat1(g_env4.humidity) + " %", UI_RIGHT_COL_X + 14, 186);
+  drawSummaryRow("LUX", formatFloat1(g_luxRaw.lux), UI_RIGHT_COL_X + 14, 244);
+  drawSummaryRow("TREND", trendLabel(g_luxMeta.trend), UI_RIGHT_COL_X + 14, 302);
 
   drawFooter();
 }
@@ -669,23 +738,27 @@ void drawSlideGraphs() {
 void drawSlideStatus() {
   drawHeader("SLIDE 4  STATUS");
 
-  drawKeyValue("SENSOR", String(g_luxStatus.sensor_ready ? "READY" : "FAIL"), 24, 70);
-  drawKeyValue("STATUS", String(g_luxStatus.status), 24, 180);
-  drawKeyValue("REASON", String(g_luxStatus.reason), 24, 290, &fonts::Font4);
+  drawCard(UI_LEFT_COL_X, 88, 220, 410, "HEALTH");
+  drawCard(296, 88, 220, 410, "NETWORK");
 
-  drawKeyValue("WIFI", String(g_luxStatus.wifi), 290, 70);
-  drawKeyValue("IP", String(g_luxStatus.ip), 290, 180, &fonts::Font4);
-  drawKeyValue("ERR CNT", String(g_luxStatus.sensor_error_count), 290, 290);
-  drawKeyValue("MQTT RETRY", String(g_luxStatus.mqtt_reconnect_count), 290, 400);
+  drawTextPair("SENSOR", String(g_luxStatus.sensor_ready ? "READY" : "FAIL"), UI_LEFT_COL_X + 14, 136, 126, &fonts::Font4);
+  drawTextPair("STATUS", String(g_luxStatus.status), UI_LEFT_COL_X + 14, 214, 126, &fonts::Font4);
+  drawTextPair("REASON", String(g_luxStatus.reason), UI_LEFT_COL_X + 14, 292, 126, &fonts::Font4);
+
+  drawTextPair("WIFI", String(g_luxStatus.wifi), 310, 136, 384, &fonts::Font4);
+  drawTextPair("IP", String(g_luxStatus.ip), 310, 214, 384, &fonts::Font4);
+  drawTextPair("ERR CNT", String(g_luxStatus.sensor_error_count), 310, 292, 408, &fonts::Font4);
+  drawTextPair("MQTT RETRY", String(g_luxStatus.mqtt_reconnect_count), 310, 370, 438, &fonts::Font4);
+  drawTextPair("UPDATED", formatUnixTime(g_luxStatus.unix_time), 310, 448, 386, &fonts::Font2);
 
   if (strcmp(g_luxStatus.status, "ok") != 0) {
     const int warnX = 20;
-    const int warnY = M5.Display.height() - 110;
+    const int warnY = M5.Display.height() - 108;
     const int warnW = M5.Display.width() - 40;
-    const int warnH = 42;
+    const int warnH = 38;
     M5.Display.fillRect(warnX, warnY, warnW, warnH, TFT_BLACK);
     M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
-    M5.Display.drawCentreString("WARNING: SENSOR / MQTT ISSUE", M5.Display.width() / 2, warnY + 12, &fonts::Font2);
+    M5.Display.drawCentreString("WARNING: SENSOR / MQTT ISSUE", M5.Display.width() / 2, warnY + 10, &fonts::Font2);
     M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
   }
 
