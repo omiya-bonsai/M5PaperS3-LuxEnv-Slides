@@ -1168,10 +1168,14 @@ void drawSlideSummary() {
   int rainSigns = (isRainSign("PRESSURE", pArrow) ? 1 : 0) +
                   (isRainSign("HUMIDITY", hArrow) ? 1 : 0) +
                   ((lightActive && isRainSign("LIGHT", lArrow)) ? 1 : 0);
+  String luxValue = formatFloat1(g_luxRaw.lux);
+  if (!lightActive && g_luxRaw.valid) {
+    luxValue += "  night";
+  }
 
   drawCard(UI_MARGIN_X, currentY, cardW, currentH, "CURRENT VALUES");
   drawMetricWithIcon(ICON_TEMP, "TEMP", formatFloat1(g_env4.temperature), "C", innerX, 126, leftUnitX);
-  drawMetricWithIcon(ICON_LIGHT, "LUX", formatFloat1(g_luxRaw.lux), "", rightColX, 126, 0);
+  drawMetricWithIcon(ICON_LIGHT, "LUX", luxValue, "", rightColX, 126, 0);
   drawMetricWithIcon(ICON_HUMIDITY, "HUM", formatFloat1(g_env4.humidity), "%", innerX, 262, leftUnitX);
   drawMetricWithIcon(ICON_PRESSURE, "PRES", formatFloat1(g_env4.pressure), "hPa", rightColX, 262, rightUnitX);
 
@@ -1180,12 +1184,12 @@ void drawSlideSummary() {
   drawChangeSummaryRow(ICON_HUMIDITY, "HUMIDITY", hArrow, 578);
   drawChangeSummaryRow(ICON_LIGHT, "LIGHT", lightDisplay, 640);
   M5.Display.drawLine(innerX, 708, UI_MARGIN_X + cardW - 20, 708, TFT_BLACK);
-  M5.Display.drawString("LUX RATE (vs avg, last 6 min)", innerX, 728, &fonts::Font2);
-  M5.Display.drawRightString(formatFloat2(g_luxMeta.rate_pct) + " %", UI_MARGIN_X + cardW - 20, 726, &fonts::Font4);
-  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), innerX, 768, &fonts::Font4);
+  M5.Display.drawString("LUX RATE (vs avg, last 6 min)", innerX, 726, &fonts::Font2);
+  M5.Display.drawRightString(formatFloat2(g_luxMeta.rate_pct) + " %", UI_MARGIN_X + cardW - 20, 724, &fonts::Font4);
+  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), innerX, 760, &fonts::Font4);
   M5.Display.drawString(lightActive ? "Pressure down + humidity up + light down are clues."
                                    : "Night mode: light is skipped after sustained darkness.",
-                        innerX, 798, &fonts::Font2);
+                        innerX, 788, &fonts::Font2);
 
   drawFooter();
 }
@@ -1208,11 +1212,11 @@ void drawSlideSignals() {
   drawSignalRow(ICON_LIGHT, "LIGHT", lightDisplay, lightActive ? normalizedLuxTrend() : 0.0f, 470);
 
   drawCard(UI_MARGIN_X, 676, M5.Display.width() - UI_MARGIN_X * 2, 132, "INTERPRET");
-  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), UI_MARGIN_X + 18, 716, &fonts::Font4);
+  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), UI_MARGIN_X + 18, 710, &fonts::Font4);
   M5.Display.drawString(lightActive ? "Pressure down + humidity up + light down are clues."
                                    : "Night mode: light is skipped after sustained darkness.",
-                        UI_MARGIN_X + 18, 744, &fonts::Font2);
-  M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X - 28, 776, &fonts::Font4);
+                        UI_MARGIN_X + 18, 740, &fonts::Font2);
+  M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X - 34, 786, &fonts::Font2);
 
   drawFooter();
 }
