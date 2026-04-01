@@ -38,8 +38,11 @@ static constexpr uint32_t NTP_RETRY_MS         = 60000;
 static constexpr uint32_t STATE_SAVE_MS        = 30000;
 
 // ---------------------- history ------------------------------
-static constexpr size_t HISTORY_CAP = 72;  // 72 x 5 min = 6h if upstream is 5 min
-                                      // also works for shorter intervals as a rolling window
+static constexpr size_t HISTORY_CAP = 300;  // Covers ~150 min at 30 s lux updates.
+static constexpr uint32_t SHORT_WINDOW_MIN = 15;
+static constexpr uint32_t LONG_WINDOW_MIN = 120;
+static constexpr uint8_t MAIN_SLIDE_COUNT = 4;
+static constexpr uint8_t STATUS_SCREEN_INDEX = 4;
 
 struct Env4Data {
   uint32_t ts = 0;
@@ -133,10 +136,17 @@ LuxStatusData g_luxStatus;
 RingBuffer<PointEnv, HISTORY_CAP> g_envHist;
 RingBuffer<PointLux, HISTORY_CAP> g_luxHist;
 
+float g_pressureGraphVals[HISTORY_CAP];
+float g_humidityGraphVals[HISTORY_CAP];
+float g_luxGraphVals[HISTORY_CAP];
+uint32_t g_envGraphTs[HISTORY_CAP];
+uint32_t g_luxGraphTs[HISTORY_CAP];
+
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
 uint8_t g_currentSlide = 0;
+uint8_t g_lastMainSlide = 0;
 uint32_t g_lastSlideMs = 0;
 uint32_t g_lastRefreshMs = 0;
 uint32_t g_lastWifiAttemptMs = 0;
@@ -187,6 +197,31 @@ float safeLatestTs() {
   if (g_luxRaw.valid && g_luxRaw.unix_time > 0) return g_luxRaw.unix_time;
   if (g_env4.valid && g_env4.ts > 0) return g_env4.ts;
   return 0;
+}
+
+bool hasValidDisplayTime() {
+  if (g_luxRaw.valid && g_luxRaw.time_valid && g_luxRaw.unix_time > 1700000000UL) return true;
+  if (g_luxMeta.valid && g_luxMeta.time_valid && g_luxMeta.unix_time > 1700000000UL) return true;
+  if (g_env4.valid && g_env4.time_valid && g_env4.ts > 1700000000UL) return true;
+  if (g_luxStatus.valid && g_luxStatus.time_valid && g_luxStatus.unix_time > 1700000000UL) return true;
+  return false;
+}
+
+String formatFooterTime() {
+  if (!hasValidDisplayTime()) return "--:--";
+  return formatUnixTime((uint32_t)safeLatestTs());
+}
+
+String formatBatteryStatus() {
+  int batt = M5.Power.getBatteryLevel();
+  if (batt < 0 || batt > 100) {
+    return "--%";
+  }
+  String label = String(batt) + "%";
+  if (M5.Power.isCharging()) {
+    label += "+";
+  }
+  return label;
 }
 
 void ensureLogDirs() {
@@ -535,18 +570,19 @@ void drawHeader(const char* title) {
   M5.Display.fillRect(0, 0, M5.Display.width(), UI_HEADER_H - 8, TFT_BLACK);
   M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
   M5.Display.drawString(title, 16, 14, &fonts::Font4);
+  M5.Display.drawRightString(formatBatteryStatus(), M5.Display.width() - 16, 16, &fonts::Font2);
 
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
   M5.Display.drawLine(0, UI_HEADER_H, M5.Display.width(), UI_HEADER_H, TFT_BLACK);
 }
 
 void drawFooter() {
-  String ts = formatUnixTime((uint32_t)safeLatestTs());
+  String ts = formatFooterTime();
   String net = (WiFi.status() == WL_CONNECTED) ? "WIFI OK" : "WIFI NG";
   String mq = mqttClient.connected() ? "MQTT OK" : "MQTT NG";
   const int btnX = (M5.Display.width() - FOOTER_BUTTON_W) / 2;
   const int btnY = M5.Display.height() - UI_FOOTER_H + 6;
-  const char* btnLabel = (g_currentSlide == 3) ? "BACK" : "STATUS";
+  const char* btnLabel = (g_currentSlide == STATUS_SCREEN_INDEX) ? "BACK" : "STATUS";
 
   M5.Display.drawLine(0, M5.Display.height() - UI_FOOTER_H, M5.Display.width(), M5.Display.height() - UI_FOOTER_H, TFT_BLACK);
   M5.Display.drawString(ts, UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
@@ -654,6 +690,39 @@ String formatClockOnly(uint32_t ts) {
   char buf[16];
   snprintf(buf, sizeof(buf), "%02d:%02d", tmLocal.tm_hour, tmLocal.tm_min);
   return String(buf);
+}
+
+size_t collectEnvWindow(float* pressureVals, float* humidityVals, uint32_t* tsVals, uint32_t windowMin) {
+  if (g_envHist.count == 0) return 0;
+
+  uint32_t newestTs = g_envHist.at(g_envHist.count - 1).ts;
+  uint32_t cutoffTs = (newestTs > windowMin * 60) ? (newestTs - windowMin * 60) : 0;
+  size_t out = 0;
+  for (size_t i = 0; i < g_envHist.count; ++i) {
+    const auto& point = g_envHist.at(i);
+    if (point.ts < cutoffTs) continue;
+    pressureVals[out] = point.pressure;
+    humidityVals[out] = point.humidity;
+    tsVals[out] = point.ts;
+    ++out;
+  }
+  return out;
+}
+
+size_t collectLuxWindow(float* luxVals, uint32_t* tsVals, uint32_t windowMin) {
+  if (g_luxHist.count == 0) return 0;
+
+  uint32_t newestTs = g_luxHist.at(g_luxHist.count - 1).ts;
+  uint32_t cutoffTs = (newestTs > windowMin * 60) ? (newestTs - windowMin * 60) : 0;
+  size_t out = 0;
+  for (size_t i = 0; i < g_luxHist.count; ++i) {
+    const auto& point = g_luxHist.at(i);
+    if (point.ts < cutoffTs) continue;
+    luxVals[out] = point.lux;
+    tsVals[out] = point.ts;
+    ++out;
+  }
+  return out;
 }
 
 void drawCard(int x, int y, int w, int h, const char* title) {
@@ -906,48 +975,37 @@ void drawSlideSignals() {
   drawFooter();
 }
 
-void drawSlideGraphs() {
-  drawHeader("SLIDE 3  GRAPHS");
+void drawTrendGraphsSlide(const char* title, uint32_t targetWindowMin) {
+  drawHeader(title);
 
-  float pressureVals[HISTORY_CAP];
-  float humidityVals[HISTORY_CAP];
-  float luxVals[HISTORY_CAP];
-
-  size_t envN = g_envHist.count;
-  for (size_t i = 0; i < envN; ++i) {
-    pressureVals[i] = g_envHist.at(i).pressure;
-    humidityVals[i] = g_envHist.at(i).humidity;
-  }
-
-  size_t luxN = g_luxHist.count;
-  for (size_t i = 0; i < luxN; ++i) {
-    luxVals[i] = g_luxHist.at(i).lux;
-  }
+  size_t envN = collectEnvWindow(g_pressureGraphVals, g_humidityGraphVals, g_envGraphTs, targetWindowMin);
+  size_t luxN = collectLuxWindow(g_luxGraphVals, g_luxGraphTs, targetWindowMin);
 
   uint32_t oldestTs = 0;
   uint32_t newestTs = 0;
   if (envN > 0) {
-    oldestTs = g_envHist.at(0).ts;
-    newestTs = g_envHist.at(envN - 1).ts;
-  } else if (luxN > 0) {
-    oldestTs = g_luxHist.at(0).ts;
-    newestTs = g_luxHist.at(luxN - 1).ts;
+    oldestTs = g_envGraphTs[0];
+    newestTs = g_envGraphTs[envN - 1];
+  }
+  if (luxN > 0) {
+    if (oldestTs == 0 || g_luxGraphTs[0] < oldestTs) oldestTs = g_luxGraphTs[0];
+    if (g_luxGraphTs[luxN - 1] > newestTs) newestTs = g_luxGraphTs[luxN - 1];
   }
   uint32_t spanMin = (oldestTs > 0 && newestTs > oldestTs) ? ((newestTs - oldestTs) / 60) : 0;
 
   String startLabel = formatClockOnly(oldestTs);
   String endLabel = formatClockOnly(newestTs);
   drawSimpleLineGraphFloat(UI_MARGIN_X, 92, M5.Display.width() - UI_MARGIN_X * 2, 188,
-                           ICON_PRESSURE, pressureVals, envN, "PRESSURE", "hPa", startLabel, endLabel);
+                           ICON_PRESSURE, g_pressureGraphVals, envN, "PRESSURE", "hPa", startLabel, endLabel);
   drawSimpleLineGraphFloat(UI_MARGIN_X, 302, M5.Display.width() - UI_MARGIN_X * 2, 188,
-                           ICON_HUMIDITY, humidityVals, envN, "HUMIDITY", "%", startLabel, endLabel);
+                           ICON_HUMIDITY, g_humidityGraphVals, envN, "HUMIDITY", "%", startLabel, endLabel);
   drawSimpleLineGraphFloat(UI_MARGIN_X, 512, M5.Display.width() - UI_MARGIN_X * 2, 188,
-                           ICON_LIGHT, luxVals, luxN, "LUX", "", startLabel, endLabel);
+                           ICON_LIGHT, g_luxGraphVals, luxN, "LUX", "", startLabel, endLabel);
 
   M5.Display.drawLine(UI_MARGIN_X, 726, M5.Display.width() - UI_MARGIN_X, 726, TFT_BLACK);
   M5.Display.drawString("NOW", UI_MARGIN_X + 4, 744, &fonts::Font2);
   M5.Display.drawRightString(String("WINDOW ") + formatClockOnly(oldestTs) + " - " + formatClockOnly(newestTs) +
-                             "  (" + String(spanMin) + " min)",
+                             "  (" + String(spanMin) + " min / target " + String(targetWindowMin) + " min)",
                              M5.Display.width() - UI_MARGIN_X, 744, &fonts::Font2);
   drawSummaryIconRow(ICON_PRESSURE, "PRES", formatFloat1(g_env4.pressure) + " hPa", UI_MARGIN_X + 16, 776);
   drawSummaryIconRow(ICON_HUMIDITY, "HUM", formatFloat1(g_env4.humidity) + " %", UI_MARGIN_X + 16, 808);
@@ -956,8 +1014,16 @@ void drawSlideGraphs() {
   drawFooter();
 }
 
+void drawSlideGraphsShort() {
+  drawTrendGraphsSlide("SLIDE 3  SHORT-TERM", SHORT_WINDOW_MIN);
+}
+
+void drawSlideGraphsLong() {
+  drawTrendGraphsSlide("SLIDE 4  LONG-TERM", LONG_WINDOW_MIN);
+}
+
 void drawSlideStatus() {
-  drawHeader("SLIDE 4  STATUS");
+  drawHeader("STATUS");
   const int cardW = M5.Display.width() - UI_MARGIN_X * 2;
   const int healthX = UI_MARGIN_X + 18;
   const int healthRight = M5.Display.width() - UI_MARGIN_X - 22;
@@ -1008,8 +1074,9 @@ void renderSlide() {
   switch (g_currentSlide) {
     case 0: drawSlideSummary(); break;
     case 1: drawSlideSignals(); break;
-    case 2: drawSlideGraphs(); break;
-    case 3: drawSlideStatus(); break;
+    case 2: drawSlideGraphsShort(); break;
+    case 3: drawSlideGraphsLong(); break;
+    case STATUS_SCREEN_INDEX: drawSlideStatus(); break;
     default: drawSlideSummary(); break;
   }
 }
@@ -1065,19 +1132,23 @@ void setup() {
 
 void handleButtons() {
   if (M5.BtnA.wasClicked()) {
-    if (g_currentSlide == 3) {
-      g_currentSlide = 2;
+    if (g_currentSlide == STATUS_SCREEN_INDEX) {
+      g_currentSlide = g_lastMainSlide;
     } else {
-      g_currentSlide = (g_currentSlide + 2) % 3;
+      g_currentSlide = (g_currentSlide + MAIN_SLIDE_COUNT - 1) % MAIN_SLIDE_COUNT;
+      g_lastMainSlide = g_currentSlide;
     }
+    g_lastSlideMs = millis();
     g_needRedraw = true;
   }
   if (M5.BtnC.wasClicked()) {
-    if (g_currentSlide == 3) {
-      g_currentSlide = 0;
+    if (g_currentSlide == STATUS_SCREEN_INDEX) {
+      g_currentSlide = g_lastMainSlide;
     } else {
-      g_currentSlide = (g_currentSlide + 1) % 3;
+      g_currentSlide = (g_currentSlide + 1) % MAIN_SLIDE_COUNT;
+      g_lastMainSlide = g_currentSlide;
     }
+    g_lastSlideMs = millis();
     g_needRedraw = true;
   }
   if (M5.BtnB.wasClicked()) {
@@ -1087,7 +1158,12 @@ void handleButtons() {
   if (M5.Touch.getCount()) {
     const auto& touch = M5.Touch.getDetail();
     if (touch.wasClicked() && footerButtonContains(touch.x, touch.y)) {
-      g_currentSlide = (g_currentSlide == 3) ? 0 : 3;
+      if (g_currentSlide == STATUS_SCREEN_INDEX) {
+        g_currentSlide = g_lastMainSlide;
+      } else {
+        g_lastMainSlide = g_currentSlide;
+        g_currentSlide = STATUS_SCREEN_INDEX;
+      }
       g_lastSlideMs = millis();
       g_needRedraw = true;
     }
@@ -1109,8 +1185,9 @@ void loop() {
 
   uint32_t nowMs = millis();
   if (nowMs - g_lastSlideMs >= SLIDE_INTERVAL_MS) {
-    if (g_currentSlide != 3) {
-      g_currentSlide = (g_currentSlide + 1) % 3;
+    if (g_currentSlide != STATUS_SCREEN_INDEX) {
+      g_currentSlide = (g_currentSlide + 1) % MAIN_SLIDE_COUNT;
+      g_lastMainSlide = g_currentSlide;
     }
     g_lastSlideMs = nowMs;
     g_needRedraw = true;
