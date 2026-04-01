@@ -1403,7 +1403,7 @@ void setup() {
   M5.Display.drawString("BOOTING...", 30, 30, &fonts::Font4);
   Serial.println("[SETUP] boot screen drawn");
 
-  g_sdReady = SD.begin();
+  g_sdReady = SD.begin(GPIO_NUM_47, SPI, 40000000);  // 40 MHz for stable SD access on PaperS3.
   Serial.printf("[SETUP] SD.begin() -> %s\n", g_sdReady ? "ok" : "ng");
   if (g_sdReady) {
     ensureLogDirs();
