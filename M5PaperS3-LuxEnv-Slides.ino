@@ -614,10 +614,76 @@ const char* signalGlyph(const String& signal) {
   return "STEADY";
 }
 
-void drawSignalRow(const char* label, const String& signal, int y) {
+float clamp01(float v) {
+  if (v < 0.0f) return 0.0f;
+  if (v > 1.0f) return 1.0f;
+  return v;
+}
+
+void drawCenteredGauge(int x, int y, int w, int h, float normalized) {
+  const int mid = x + w / 2;
+  const int innerY = y + 2;
+  const int innerH = h - 4;
+  M5.Display.drawRect(x, y, w, h, TFT_BLACK);
+  M5.Display.drawLine(mid, y + 1, mid, y + h - 2, TFT_BLACK);
+
+  float clamped = clamp01(fabs(normalized));
+  int halfW = (w - 6) / 2;
+  int fillW = (int)(halfW * clamped);
+  if (fillW <= 0) return;
+
+  if (normalized > 0.0f) {
+    M5.Display.fillRect(mid + 1, innerY, fillW, innerH, TFT_BLACK);
+  } else if (normalized < 0.0f) {
+    M5.Display.fillRect(mid - fillW, innerY, fillW, innerH, TFT_BLACK);
+  } else {
+    M5.Display.fillRect(mid - 6, innerY, 12, innerH, TFT_BLACK);
+  }
+}
+
+void drawFillGauge(int x, int y, int w, int h, float normalized) {
+  M5.Display.drawRect(x, y, w, h, TFT_BLACK);
+  int fillW = (int)((w - 4) * clamp01(normalized));
+  if (fillW > 0) {
+    M5.Display.fillRect(x + 2, y + 2, fillW, h - 4, TFT_BLACK);
+  }
+}
+
+float normalizedRate(float ratePct) {
+  if (isnan(ratePct)) return 0.0f;
+  float n = ratePct / 10.0f;
+  if (n > 1.0f) n = 1.0f;
+  if (n < -1.0f) n = -1.0f;
+  return n;
+}
+
+float normalizedPressureTrend() {
+  if (g_envHist.count < 2) return 0.0f;
+  float delta = g_envHist.at(g_envHist.count - 1).pressure - g_envHist.at(0).pressure;
+  float n = delta / 1.5f;
+  if (n > 1.0f) n = 1.0f;
+  if (n < -1.0f) n = -1.0f;
+  return n;
+}
+
+float normalizedHumidityTrend() {
+  if (g_envHist.count < 2) return 0.0f;
+  float delta = g_envHist.at(g_envHist.count - 1).humidity - g_envHist.at(0).humidity;
+  float n = delta / 8.0f;
+  if (n > 1.0f) n = 1.0f;
+  if (n < -1.0f) n = -1.0f;
+  return n;
+}
+
+float normalizedLuxTrend() {
+  if (!g_luxMeta.valid) return 0.0f;
+  return normalizedRate(g_luxMeta.rate_pct);
+}
+
+void drawSignalRow(const char* label, const String& signal, float gaugeValue, int y) {
   M5.Display.drawString(label, UI_MARGIN_X + 10, y + 10, &fonts::Font4);
-  M5.Display.drawCentreString(signalGlyph(signal), 250, y + 4, &fonts::Font4);
-  M5.Display.drawRightString(signal, M5.Display.width() - UI_MARGIN_X - 16, y + 18, &fonts::Font2);
+  drawCenteredGauge(190, y + 18, 180, 18, gaugeValue);
+  M5.Display.drawString(signalGlyph(signal), 392, y + 6, &fonts::Font4);
   M5.Display.drawLine(UI_MARGIN_X, y + 70, M5.Display.width() - UI_MARGIN_X, y + 70, TFT_BLACK);
 }
 
@@ -678,9 +744,10 @@ void drawSlideSummary() {
   drawCard(UI_RIGHT_COL_X, 86, UI_RIGHT_COL_W, 412, "LIGHT TREND");
   M5.Display.drawString("RATE", UI_RIGHT_COL_X + 14, 134, &fonts::Font2);
   M5.Display.drawString(formatFloat2(g_luxMeta.rate_pct) + " %", UI_RIGHT_COL_X + 14, 158, &fonts::Font4);
-  M5.Display.drawString("NOW VS AVG", UI_RIGHT_COL_X + 14, 220, &fonts::Font2);
-  M5.Display.drawString(formatFloat1(g_luxMeta.delta), UI_RIGHT_COL_X + 14, 244, &fonts::Font4);
-  M5.Display.drawString("lux delta", UI_RIGHT_COL_X + 14, 278, &fonts::Font2);
+  drawCenteredGauge(UI_RIGHT_COL_X + 14, 198, UI_RIGHT_COL_W - 28, 22, normalizedRate(g_luxMeta.rate_pct));
+  M5.Display.drawString("NOW VS AVG", UI_RIGHT_COL_X + 14, 248, &fonts::Font2);
+  M5.Display.drawString(formatFloat1(g_luxMeta.delta), UI_RIGHT_COL_X + 14, 272, &fonts::Font4);
+  drawCenteredGauge(UI_RIGHT_COL_X + 14, 312, UI_RIGHT_COL_W - 28, 22, normalizedRate(g_luxMeta.delta));
   M5.Display.drawString("TREND", UI_RIGHT_COL_X + 14, 346, &fonts::Font2);
   drawTrendBadge(g_luxMeta.trend, UI_RIGHT_COL_X + 14, 372);
 
@@ -694,9 +761,9 @@ void drawSlideSignals() {
   String hArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).humidity - g_envHist.at(0).humidity : NAN);
   String lArrow = arrowForDelta(g_luxMeta.delta);
 
-  drawSignalRow("PRESSURE", pArrow, 96);
-  drawSignalRow("HUMIDITY", hArrow, 214);
-  drawSignalRow("LIGHT", lArrow, 332);
+  drawSignalRow("PRESSURE", pArrow, normalizedPressureTrend(), 96);
+  drawSignalRow("HUMIDITY", hArrow, normalizedHumidityTrend(), 214);
+  drawSignalRow("LIGHT", lArrow, normalizedLuxTrend(), 332);
 
   M5.Display.drawString("QUESTION", UI_MARGIN_X + 10, 470, &fonts::Font2);
   M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X, 464, &fonts::Font4);
@@ -728,8 +795,11 @@ void drawSlideGraphs() {
 
   drawCard(UI_RIGHT_COL_X, 74, UI_RIGHT_COL_W, 424, "NOW");
   drawSummaryRow("PRES", formatFloat1(g_env4.pressure) + " hPa", UI_RIGHT_COL_X + 14, 128);
+  drawCenteredGauge(UI_RIGHT_COL_X + 14, 154, UI_RIGHT_COL_W - 28, 16, normalizedPressureTrend());
   drawSummaryRow("HUM", formatFloat1(g_env4.humidity) + " %", UI_RIGHT_COL_X + 14, 186);
+  drawCenteredGauge(UI_RIGHT_COL_X + 14, 212, UI_RIGHT_COL_W - 28, 16, normalizedHumidityTrend());
   drawSummaryRow("LUX", formatFloat1(g_luxRaw.lux), UI_RIGHT_COL_X + 14, 244);
+  drawCenteredGauge(UI_RIGHT_COL_X + 14, 270, UI_RIGHT_COL_W - 28, 16, normalizedLuxTrend());
   drawSummaryRow("TREND", trendLabel(g_luxMeta.trend), UI_RIGHT_COL_X + 14, 302);
 
   drawFooter();
@@ -742,13 +812,16 @@ void drawSlideStatus() {
   drawCard(296, 88, 220, 410, "NETWORK");
 
   drawTextPair("SENSOR", String(g_luxStatus.sensor_ready ? "READY" : "FAIL"), UI_LEFT_COL_X + 14, 136, 126, &fonts::Font4);
+  drawFillGauge(UI_LEFT_COL_X + 14, 170, 180, 14, g_luxStatus.sensor_ready ? 1.0f : 0.15f);
   drawTextPair("STATUS", String(g_luxStatus.status), UI_LEFT_COL_X + 14, 214, 126, &fonts::Font4);
   drawTextPair("REASON", String(g_luxStatus.reason), UI_LEFT_COL_X + 14, 292, 126, &fonts::Font4);
 
   drawTextPair("WIFI", String(g_luxStatus.wifi), 310, 136, 384, &fonts::Font4);
+  drawFillGauge(310, 170, 180, 14, strcmp(g_luxStatus.wifi, "connected") == 0 ? 1.0f : 0.15f);
   drawTextPair("IP", String(g_luxStatus.ip), 310, 214, 384, &fonts::Font4);
   drawTextPair("ERR CNT", String(g_luxStatus.sensor_error_count), 310, 292, 408, &fonts::Font4);
   drawTextPair("MQTT RETRY", String(g_luxStatus.mqtt_reconnect_count), 310, 370, 438, &fonts::Font4);
+  drawFillGauge(310, 404, 180, 14, mqttClient.connected() ? 1.0f : 0.15f);
   drawTextPair("UPDATED", formatUnixTime(g_luxStatus.unix_time), 310, 448, 386, &fonts::Font2);
 
   if (strcmp(g_luxStatus.status, "ok") != 0) {
