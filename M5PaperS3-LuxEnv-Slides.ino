@@ -147,10 +147,7 @@ PubSubClient mqttClient(wifiClient);
 
 uint8_t g_currentSlide = 0;
 uint8_t g_lastMainSlide = 0;
-uint32_t g_bootMs = 0;
 uint32_t g_liveDisplayTs = 0;
-uint8_t g_liveValidTimeCount = 0;
-bool g_displayTimeLocked = false;
 uint32_t g_lastSlideMs = 0;
 uint32_t g_lastRefreshMs = 0;
 uint32_t g_lastWifiAttemptMs = 0;
@@ -165,9 +162,9 @@ bool g_timeValid = false;
 // ---------------------- utilities ----------------------------
 String formatUnixTime(uint32_t ts) {
   if (ts == 0) return "----/--/-- --:--";
-  time_t t = static_cast<time_t>(ts);
+  time_t t = static_cast<time_t>(ts + 9 * 3600UL);
   struct tm tmLocal;
-  localtime_r(&t, &tmLocal);
+  gmtime_r(&t, &tmLocal);
 
   char buf[32];
   snprintf(buf, sizeof(buf), "%04d/%02d/%02d %02d:%02d",
@@ -206,16 +203,10 @@ float safeLatestTs() {
 void noteLiveDisplayTime(uint32_t ts, bool timeValid) {
   if (!timeValid || ts <= 1700000000UL) return;
   g_liveDisplayTs = ts;
-  if (g_liveValidTimeCount < 255) {
-    ++g_liveValidTimeCount;
-  }
-  if (!g_displayTimeLocked && (millis() - g_bootMs) >= 120000UL && g_liveValidTimeCount >= 2) {
-    g_displayTimeLocked = true;
-  }
 }
 
 bool hasValidDisplayTime() {
-  return g_displayTimeLocked && g_liveDisplayTs > 1700000000UL;
+  return g_liveDisplayTs > 1700000000UL;
 }
 
 String formatFooterTime() {
@@ -698,9 +689,9 @@ void drawSummaryMetric(const char* label, const String& value, const String& uni
 
 String formatClockOnly(uint32_t ts) {
   if (ts == 0) return "--:--";
-  time_t t = static_cast<time_t>(ts);
+  time_t t = static_cast<time_t>(ts + 9 * 3600UL);
   struct tm tmLocal;
-  localtime_r(&t, &tmLocal);
+  gmtime_r(&t, &tmLocal);
 
   char buf[16];
   snprintf(buf, sizeof(buf), "%02d:%02d", tmLocal.tm_hour, tmLocal.tm_min);
@@ -1139,7 +1130,6 @@ void setup() {
   Serial.println("[SETUP] initial connect attempts done");
 
   g_needRedraw = true;
-  g_bootMs = millis();
   g_lastSlideMs = millis();
   g_lastRefreshMs = millis() - EPD_REFRESH_MS;
   g_lastStateSaveMs = millis();
