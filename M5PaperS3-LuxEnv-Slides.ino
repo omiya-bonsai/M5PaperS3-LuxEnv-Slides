@@ -1004,11 +1004,8 @@ void drawPatternSummaryRow(int x, int y, const char* heading,
   String clueLight = isClueRow ? String("DOWN") : lSignal;
   drawSignalToken(baseX, y, "P", cluePressure);
   drawSignalToken(baseX + 66, y, "H", clueHumidity);
-  if (lightActive || !isClueRow) {
+  if (!isClueRow || lightActive) {
     drawSignalToken(baseX + 132, y, "L", lightActive ? clueLight : String("NIGHT"));
-  }
-  if (isClueRow) {
-    M5.Display.drawString(lightActive ? "(day)" : "daytime clue", baseX + 198, y, &fonts::Font2);
   }
 }
 
@@ -1107,7 +1104,7 @@ size_t sampledIndex(size_t outIdx, size_t sourceCount, size_t targetCount) {
 
 void drawSimpleLineGraphFloat(int x, int y, int w, int h, const MonoIcon& icon,
                               const float* vals, size_t n, const char* title, const char* unit,
-                              const String& startLabel, const String& endLabel,
+                              const String& startLabel, const String& midLabel, const String& endLabel,
                               size_t maxRenderPoints, bool drawAllMarkers) {
   M5.Display.drawRect(x, y, w, h, TFT_BLACK);
   drawMonoIcon(x + 6, y + 4, icon, 1);
@@ -1137,6 +1134,7 @@ void drawSimpleLineGraphFloat(int x, int y, int w, int h, const MonoIcon& icon,
   M5.Display.drawRightString(bufMax, x + w - 6, y + 4, &fonts::Font2);
   M5.Display.drawRightString(bufMin, x + w - 6, y + h - 36, &fonts::Font2);
   M5.Display.drawString(startLabel, x + 6, y + h - 18, &fonts::Font2);
+  M5.Display.drawCentreString(midLabel, x + w / 2, y + h - 18, &fonts::Font2);
   M5.Display.drawRightString(endLabel, x + w - 6, y + h - 18, &fonts::Font2);
 
   int gx = x + 10;
@@ -1176,9 +1174,9 @@ void drawSlideSummary() {
   drawHeader("SLIDE 1  CURRENT");
   const int cardW = M5.Display.width() - UI_MARGIN_X * 2;
   const int currentY = 92;
-  const int currentH = 352;
-  const int changeY = 468;
-  const int changeH = 406;
+  const int currentH = 326;
+  const int changeY = 440;
+  const int changeH = 434;
   const int innerX = UI_MARGIN_X + 20;
   const int innerW = cardW - 40;
   const int colGap = 34;
@@ -1204,19 +1202,23 @@ void drawSlideSummary() {
   drawCard(UI_MARGIN_X, currentY, cardW, currentH, "CURRENT VALUES");
   drawMetricWithIcon(ICON_TEMP, "TEMP", formatFloat1(g_env4.temperature), "C", innerX, 126, leftUnitX);
   drawMetricWithIcon(ICON_LIGHT, "LUX", luxValue, "", rightColX, 126, 0);
-  drawMetricWithIcon(ICON_HUMIDITY, "HUM", formatFloat1(g_env4.humidity), "%", innerX, 262, leftUnitX);
-  drawMetricWithIcon(ICON_PRESSURE, "PRES", formatFloat1(g_env4.pressure), "hPa", rightColX, 262, rightUnitX);
+  drawMetricWithIcon(ICON_HUMIDITY, "HUM", formatFloat1(g_env4.humidity), "%", innerX, 248, leftUnitX);
+  drawMetricWithIcon(ICON_PRESSURE, "PRES", formatFloat1(g_env4.pressure), "hPa", rightColX, 248, rightUnitX);
 
   drawCard(UI_MARGIN_X, changeY, cardW, changeH, "RECENT CHANGES");
-  drawChangeSummaryRow(ICON_PRESSURE, "PRESSURE", pArrow, 516);
-  drawChangeSummaryRow(ICON_HUMIDITY, "HUMIDITY", hArrow, 578);
-  drawChangeSummaryRow(ICON_LIGHT, "LIGHT", lightDisplay, 640);
-  M5.Display.drawLine(innerX, 708, UI_MARGIN_X + cardW - 20, 708, TFT_BLACK);
-  M5.Display.drawString("LUX RATE (vs avg, last 6 min)", innerX, 726, &fonts::Font2);
-  M5.Display.drawRightString(formatFloat2(g_luxMeta.rate_pct) + " %", UI_MARGIN_X + cardW - 20, 724, &fonts::Font4);
-  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), innerX, 760, &fonts::Font4);
-  drawPatternSummaryRow(innerX, 788, "Now:", pArrow, hArrow, lArrow, lightActive, false);
-  drawPatternSummaryRow(innerX, 816, "Clue:", pArrow, hArrow, lArrow, lightActive, true);
+  drawChangeSummaryRow(ICON_PRESSURE, "PRESSURE", pArrow, 490);
+  drawChangeSummaryRow(ICON_HUMIDITY, "HUMIDITY", hArrow, 548);
+  drawChangeSummaryRow(ICON_LIGHT, "LIGHT", lightDisplay, 606);
+  M5.Display.drawLine(innerX, 668, UI_MARGIN_X + cardW - 20, 668, TFT_BLACK);
+  M5.Display.drawString("LUX RATE (vs avg, last 6 min)", innerX, 686, &fonts::Font2);
+  M5.Display.drawRightString(formatFloat2(g_luxMeta.rate_pct) + " %", UI_MARGIN_X + cardW - 20, 684, &fonts::Font4);
+  M5.Display.drawLine(innerX, 724, UI_MARGIN_X + cardW - 20, 724, TFT_BLACK);
+  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), innerX, 744, &fonts::Font4);
+  drawPatternSummaryRow(innerX, 772, "Now:", pArrow, hArrow, lArrow, lightActive, false);
+  drawPatternSummaryRow(innerX, 800, "Look for:", pArrow, hArrow, lArrow, lightActive, true);
+  M5.Display.drawString(lightActive ? "Pressure down  Humidity up  Light down in daytime"
+                                   : "At night, use pressure and humidity.",
+                        innerX + 76, 826, &fonts::Font2);
 
   drawFooter();
 }
@@ -1234,17 +1236,20 @@ void drawSlideSignals() {
                   (isRainSign("HUMIDITY", hArrow) ? 1 : 0) +
                   ((lightActive && isRainSign("LIGHT", lArrow)) ? 1 : 0);
 
-  drawSignalRow(ICON_PRESSURE, "PRESSURE", pArrow, normalizedPressureTrend(), 102);
-  drawSignalRow(ICON_HUMIDITY, "HUMIDITY", hArrow, normalizedHumidityTrend(), 286);
-  drawSignalRow(ICON_LIGHT, "LIGHT", lightDisplay, lightActive ? normalizedLuxTrend() : 0.0f, 470);
+  drawSignalRow(ICON_PRESSURE, "PRESSURE", pArrow, normalizedPressureTrend(), 92);
+  drawSignalRow(ICON_HUMIDITY, "HUMIDITY", hArrow, normalizedHumidityTrend(), 262);
+  drawSignalRow(ICON_LIGHT, "LIGHT", lightDisplay, lightActive ? normalizedLuxTrend() : 0.0f, 432);
 
-  drawCard(UI_MARGIN_X, 676, M5.Display.width() - UI_MARGIN_X * 2, 132, "INTERPRET");
-  M5.Display.drawString("Check order: Pressure -> Humidity -> Light", UI_MARGIN_X + 18, 698, &fonts::Font2);
-  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), UI_MARGIN_X + 18, 718, &fonts::Font4);
-  drawPatternSummaryRow(UI_MARGIN_X + 18, 742, "Now:", pArrow, hArrow, lArrow, lightActive, false);
-  drawPatternSummaryRow(UI_MARGIN_X + 18, 764, "Clue:", pArrow, hArrow, lArrow, lightActive, true);
-  M5.Display.drawString("What changed first?", UI_MARGIN_X + 18, 786, &fonts::Font2);
-  M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X - 34, 786, &fonts::Font2);
+  drawCard(UI_MARGIN_X, 618, M5.Display.width() - UI_MARGIN_X * 2, 188, "INTERPRET");
+  M5.Display.drawString("Check order: Pressure -> Humidity -> Light", UI_MARGIN_X + 18, 640, &fonts::Font2);
+  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), UI_MARGIN_X + 18, 666, &fonts::Font4);
+  drawPatternSummaryRow(UI_MARGIN_X + 18, 696, "Now:", pArrow, hArrow, lArrow, lightActive, false);
+  drawPatternSummaryRow(UI_MARGIN_X + 18, 724, "Look for:", pArrow, hArrow, lArrow, lightActive, true);
+  M5.Display.drawString(lightActive ? "Pressure down  Humidity up  Light down in daytime"
+                                   : "At night, use pressure and humidity.",
+                        UI_MARGIN_X + 76, 752, &fonts::Font2);
+  M5.Display.drawString("What changed first?", UI_MARGIN_X + 18, 778, &fonts::Font2);
+  M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X - 34, 778, &fonts::Font2);
 
   drawFooter();
 }
@@ -1271,16 +1276,17 @@ void drawTrendGraphsSlide(const char* title, uint32_t targetWindowMin, const cha
   bool drawAllMarkers = !compressed;
 
   String startLabel = formatClockOnly(oldestTs);
+  String midLabel = formatClockOnly((oldestTs > 0 && newestTs >= oldestTs) ? (oldestTs + (newestTs - oldestTs) / 2) : 0);
   String endLabel = formatClockOnly(newestTs);
   drawSimpleLineGraphFloat(UI_MARGIN_X, 92, M5.Display.width() - UI_MARGIN_X * 2, 188,
                            ICON_PRESSURE, g_pressureGraphVals, envN, "PRESSURE", "hPa",
-                           startLabel, endLabel, maxRenderPoints, drawAllMarkers);
+                           startLabel, midLabel, endLabel, maxRenderPoints, drawAllMarkers);
   drawSimpleLineGraphFloat(UI_MARGIN_X, 302, M5.Display.width() - UI_MARGIN_X * 2, 188,
                            ICON_HUMIDITY, g_humidityGraphVals, envN, "HUMIDITY", "%",
-                           startLabel, endLabel, maxRenderPoints, drawAllMarkers);
+                           startLabel, midLabel, endLabel, maxRenderPoints, drawAllMarkers);
   drawSimpleLineGraphFloat(UI_MARGIN_X, 512, M5.Display.width() - UI_MARGIN_X * 2, 188,
                            ICON_LIGHT, g_luxGraphVals, luxN, "LUX", "",
-                           startLabel, endLabel, maxRenderPoints, drawAllMarkers);
+                           startLabel, midLabel, endLabel, maxRenderPoints, drawAllMarkers);
 
   M5.Display.drawLine(UI_MARGIN_X, 726, M5.Display.width() - UI_MARGIN_X, 726, TFT_BLACK);
   M5.Display.drawString(String("NOW  ") + prompt, UI_MARGIN_X + 4, 744, &fonts::Font2);
