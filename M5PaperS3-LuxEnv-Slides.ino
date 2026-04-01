@@ -864,8 +864,8 @@ void drawSlideSummary() {
   M5.Display.drawLine(innerX, 708, UI_MARGIN_X + cardW - 20, 708, TFT_BLACK);
   M5.Display.drawString("LUX RATE (vs avg, last 6 min)", innerX, 728, &fonts::Font2);
   M5.Display.drawRightString(formatFloat2(g_luxMeta.rate_pct) + " %", UI_MARGIN_X + cardW - 20, 726, &fonts::Font4);
-  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / 3", innerX, 774, &fonts::Font4);
-  M5.Display.drawString("Pressure down + humidity up + light down are clues.", innerX, 808, &fonts::Font2);
+  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / 3", innerX, 768, &fonts::Font4);
+  M5.Display.drawString("Pressure down + humidity up + light down are clues.", innerX, 798, &fonts::Font2);
 
   drawFooter();
 }
@@ -885,9 +885,9 @@ void drawSlideSignals() {
   drawSignalRow(ICON_LIGHT, "LIGHT", lArrow, normalizedLuxTrend(), 470);
 
   drawCard(UI_MARGIN_X, 676, M5.Display.width() - UI_MARGIN_X * 2, 132, "INTERPRET");
-  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / 3", UI_MARGIN_X + 18, 722, &fonts::Font4);
-  M5.Display.drawString("Pressure down + humidity up + light down are clues.", UI_MARGIN_X + 18, 756, &fonts::Font2);
-  M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X - 18, 754, &fonts::Font4);
+  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / 3", UI_MARGIN_X + 18, 716, &fonts::Font4);
+  M5.Display.drawString("Pressure down + humidity up + light down are clues.", UI_MARGIN_X + 18, 744, &fonts::Font2);
+  M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X - 18, 784, &fonts::Font4);
 
   drawFooter();
 }
@@ -953,27 +953,27 @@ void drawSlideStatus() {
   drawCard(UI_MARGIN_X, 92, cardW, 252, "HEALTH");
   drawMonoIcon(M5.Display.width() - UI_MARGIN_X - 38, 102, ICON_SENSOR, 1);
   drawTextRowAligned("SENSOR", String(g_luxStatus.sensor_ready ? "READY" : "FAIL"),
-                     healthX, healthRight - 28, 156, &fonts::Font4);
+                     healthX, healthRight - 28, 170, &fonts::Font4);
   drawTextRowAligned("STATUS", String(g_luxStatus.status),
-                     healthX, healthRight - 28, 214, &fonts::Font4);
+                     healthX, healthRight - 28, 224, &fonts::Font4);
   drawTextRowAligned("REASON", String(g_luxStatus.reason),
-                     healthX, healthRight - 28, 272, &fonts::Font4);
+                     healthX, healthRight - 28, 278, &fonts::Font4);
 
   drawCard(UI_MARGIN_X, 370, cardW, 396, "NETWORK");
   drawMonoIcon(M5.Display.width() - UI_MARGIN_X - 38, 380, ICON_WIFI, 1);
   drawTextRowAligned("WIFI", String(g_luxStatus.wifi),
-                     networkX, networkRight - 28, 432, &fonts::Font4);
+                     networkX, networkRight - 28, 444, &fonts::Font4);
   drawTextRowAligned("IP", String(g_luxStatus.ip),
-                     networkX, networkRight - 28, 486, &fonts::Font4);
+                     networkX, networkRight - 28, 496, &fonts::Font4);
   drawTextRowAligned("ERR CNT", String(g_luxStatus.sensor_error_count),
-                     networkX, networkRight - 28, 540, &fonts::Font4);
+                     networkX, networkRight - 28, 548, &fonts::Font4);
   drawMonoIcon(networkX, 618, ICON_MQTT, 1);
   drawTextRowAligned("MQTT RETRY", String(g_luxStatus.mqtt_reconnect_count),
-                     networkX, networkRight - 28, 594, &fonts::Font4);
-  M5.Display.drawLine(UI_MARGIN_X + 18, 664, M5.Display.width() - UI_MARGIN_X - 18, 664, TFT_BLACK);
+                     networkX, networkRight - 28, 600, &fonts::Font4);
+  M5.Display.drawLine(UI_MARGIN_X + 18, 670, M5.Display.width() - UI_MARGIN_X - 18, 670, TFT_BLACK);
   drawMonoIcon(networkX, 680, ICON_CLOCK, 1);
   drawTextRowAligned("UPDATED", formatUnixTime(g_luxStatus.unix_time),
-                     networkX, networkRight - 28, 686, &fonts::Font2);
+                     networkX, networkRight - 28, 698, &fonts::Font2);
 
   if (strcmp(g_luxStatus.status, "ok") != 0) {
     const int warnX = 20;
