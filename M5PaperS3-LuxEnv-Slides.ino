@@ -41,6 +41,7 @@ static constexpr uint32_t STATE_SAVE_MS        = 30000;
 static constexpr size_t HISTORY_CAP = 300;  // Covers ~150 min at 30 s lux updates.
 static constexpr uint32_t SHORT_WINDOW_MIN = 15;
 static constexpr uint32_t LONG_WINDOW_MIN = 120;
+static constexpr uint32_t CSV_STALE_LIMIT_MIN = 180;
 static constexpr uint32_t NIGHT_LUX_WINDOW_MIN = 10;
 static constexpr float NIGHT_LUX_THRESHOLD = 5.0f;
 static constexpr uint8_t MAIN_SLIDE_COUNT = 4;
@@ -101,6 +102,11 @@ struct RingBuffer {
   size_t head = 0;
   size_t count = 0;
 
+  void clear() {
+    head = 0;
+    count = 0;
+  }
+
   void push(const T& value) {
     data[head] = value;
     head = (head + 1) % N;
@@ -150,6 +156,9 @@ PubSubClient mqttClient(wifiClient);
 uint8_t g_currentSlide = 0;
 uint8_t g_lastMainSlide = 0;
 uint32_t g_liveDisplayTs = 0;
+uint32_t g_restoredEnvLatestTs = 0;
+uint32_t g_restoredLuxLatestTs = 0;
+bool g_restoreFreshnessPending = false;
 uint32_t g_lastSlideMs = 0;
 uint32_t g_lastRefreshMs = 0;
 uint32_t g_lastWifiAttemptMs = 0;
@@ -202,9 +211,31 @@ float safeLatestTs() {
   return 0;
 }
 
+void clearRestoredHistoryIfStale(uint32_t liveTs) {
+  if (!g_restoreFreshnessPending || liveTs <= 1700000000UL) return;
+
+  uint32_t latestCsvTs = g_restoredEnvLatestTs;
+  if (g_restoredLuxLatestTs > latestCsvTs) latestCsvTs = g_restoredLuxLatestTs;
+  if (latestCsvTs == 0) {
+    g_restoreFreshnessPending = false;
+    return;
+  }
+
+  uint32_t diffSec = (liveTs > latestCsvTs) ? (liveTs - latestCsvTs) : (latestCsvTs - liveTs);
+  if (diffSec > CSV_STALE_LIMIT_MIN * 60UL) {
+    g_envHist.clear();
+    g_luxHist.clear();
+    g_restoredEnvLatestTs = 0;
+    g_restoredLuxLatestTs = 0;
+    g_needRedraw = true;
+  }
+  g_restoreFreshnessPending = false;
+}
+
 void noteLiveDisplayTime(uint32_t ts, bool timeValid) {
   if (!timeValid || ts <= 1700000000UL) return;
   g_liveDisplayTs = ts;
+  clearRestoredHistoryIfStale(ts);
 }
 
 bool hasValidDisplayTime() {
@@ -365,6 +396,89 @@ void loadLatestState() {
     g_luxStatus.time_valid = status["time_valid"] | false;
     g_luxStatus.valid = status["valid"] | false;
   }
+}
+
+void restoreEnvHistoryFromCsv() {
+  if (!g_sdReady || !SD.exists("/logs/env4_log.csv")) return;
+
+  File f = SD.open("/logs/env4_log.csv", FILE_READ);
+  if (!f) return;
+
+  g_envHist.clear();
+  g_restoredEnvLatestTs = 0;
+  bool isFirstLine = true;
+  while (f.available()) {
+    String line = f.readStringUntil('\n');
+    line.trim();
+    if (line.isEmpty()) continue;
+    if (isFirstLine) {
+      isFirstLine = false;
+      if (line.startsWith("ts,")) continue;
+    }
+
+    uint32_t ts = 0;
+    float temperature = NAN;
+    float humidity = NAN;
+    float pressure = NAN;
+    uint32_t seq = 0;
+    uint32_t uptime_s = 0;
+    int time_valid = 0;
+
+    int parsed = sscanf(line.c_str(), "%u,%f,%f,%f,%u,%u,%d",
+                        &ts, &temperature, &humidity, &pressure, &seq, &uptime_s, &time_valid);
+    if (parsed < 4 || ts == 0 || isnan(pressure)) continue;
+
+    g_envHist.push({ts, temperature, humidity, pressure});
+    g_restoredEnvLatestTs = ts;
+  }
+  f.close();
+}
+
+void restoreLuxHistoryFromCsv() {
+  if (!g_sdReady || !SD.exists("/logs/lux_log.csv")) return;
+
+  File f = SD.open("/logs/lux_log.csv", FILE_READ);
+  if (!f) return;
+
+  g_luxHist.clear();
+  g_restoredLuxLatestTs = 0;
+  bool isFirstLine = true;
+  while (f.available()) {
+    String line = f.readStringUntil('\n');
+    line.trim();
+    if (line.isEmpty()) continue;
+    if (isFirstLine) {
+      isFirstLine = false;
+      if (line.startsWith("unix_time,")) continue;
+    }
+
+    uint32_t unix_time = 0;
+    float lux = NAN;
+    float avg = NAN;
+    float delta = NAN;
+    float delta_prev = NAN;
+    float rate_pct = NAN;
+    char trend[20] = {0};
+    uint32_t samples = 0;
+    uint32_t interval_ms = 0;
+    uint32_t seq = 0;
+    int time_valid = 0;
+
+    int parsed = sscanf(line.c_str(), "%u,%f,%f,%f,%f,%f,%19[^,],%u,%u,%u,%d",
+                        &unix_time, &lux, &avg, &delta, &delta_prev, &rate_pct,
+                        trend, &samples, &interval_ms, &seq, &time_valid);
+    if (parsed < 6 || unix_time == 0 || isnan(lux)) continue;
+
+    g_luxHist.push({unix_time, lux, avg, rate_pct});
+    g_restoredLuxLatestTs = unix_time;
+  }
+  f.close();
+}
+
+void restoreHistoryFromCsv() {
+  restoreEnvHistoryFromCsv();
+  restoreLuxHistoryFromCsv();
+  g_restoreFreshnessPending = (g_restoredEnvLatestTs > 0 || g_restoredLuxLatestTs > 0);
 }
 
 // ---------------------- connectivity -------------------------
@@ -1218,6 +1332,7 @@ void setup() {
   if (g_sdReady) {
     ensureLogDirs();
     loadLatestState();
+    restoreHistoryFromCsv();
     Serial.println("[SETUP] state restored");
   }
 
