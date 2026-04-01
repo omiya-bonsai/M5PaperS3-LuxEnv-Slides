@@ -984,21 +984,32 @@ const char* signalMeaning(const char* label, const String& signal) {
   return "watch";
 }
 
-const char* signalMark(const String& signal) {
-  if (signal == "UP") return "^";
-  if (signal == "DOWN") return "v";
-  if (signal == "NIGHT") return "night";
-  return "-";
+void drawSignalToken(int x, int y, const char* label, const String& signal) {
+  M5.Display.drawString(label, x, y, &fonts::Font2);
+  int iconX = x + 16;
+  if (signal == "NIGHT") {
+    M5.Display.drawString("night", iconX, y, &fonts::Font2);
+    return;
+  }
+  drawMonoIcon(iconX, y - 2, signalIcon(signal), 1);
 }
 
-String signalPatternSummary(const String& pArrow, const String& hArrow, const String& lArrow, bool lightActive) {
-  String lightToken = lightActive ? String(signalMark(lArrow)) : String("night");
-  return String("Now: P ") + signalMark(pArrow) + "  H " + signalMark(hArrow) + "  L " + lightToken;
-}
-
-String clueSetSummary(bool lightActive) {
-  return lightActive ? String("Clue: P v  H ^  L v (day)")
-                     : String("Clue: P v  H ^  | Light is a daytime clue");
+void drawPatternSummaryRow(int x, int y, const char* heading,
+                           const String& pSignal, const String& hSignal, const String& lSignal,
+                           bool lightActive, bool isClueRow) {
+  M5.Display.drawString(heading, x, y, &fonts::Font2);
+  int baseX = x + 48;
+  String cluePressure = isClueRow ? String("DOWN") : pSignal;
+  String clueHumidity = isClueRow ? String("UP") : hSignal;
+  String clueLight = isClueRow ? String("DOWN") : lSignal;
+  drawSignalToken(baseX, y, "P", cluePressure);
+  drawSignalToken(baseX + 66, y, "H", clueHumidity);
+  if (lightActive || !isClueRow) {
+    drawSignalToken(baseX + 132, y, "L", lightActive ? clueLight : String("NIGHT"));
+  }
+  if (isClueRow) {
+    M5.Display.drawString(lightActive ? "(day)" : "daytime clue", baseX + 198, y, &fonts::Font2);
+  }
 }
 
 void drawChangeSummaryRow(const MonoIcon& icon, const char* label, const String& signal, int y) {
@@ -1204,8 +1215,8 @@ void drawSlideSummary() {
   M5.Display.drawString("LUX RATE (vs avg, last 6 min)", innerX, 726, &fonts::Font2);
   M5.Display.drawRightString(formatFloat2(g_luxMeta.rate_pct) + " %", UI_MARGIN_X + cardW - 20, 724, &fonts::Font4);
   M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), innerX, 760, &fonts::Font4);
-  M5.Display.drawString(signalPatternSummary(pArrow, hArrow, lArrow, lightActive), innerX, 788, &fonts::Font2);
-  M5.Display.drawString(clueSetSummary(lightActive), innerX, 816, &fonts::Font2);
+  drawPatternSummaryRow(innerX, 788, "Now:", pArrow, hArrow, lArrow, lightActive, false);
+  drawPatternSummaryRow(innerX, 816, "Clue:", pArrow, hArrow, lArrow, lightActive, true);
 
   drawFooter();
 }
@@ -1230,10 +1241,8 @@ void drawSlideSignals() {
   drawCard(UI_MARGIN_X, 676, M5.Display.width() - UI_MARGIN_X * 2, 132, "INTERPRET");
   M5.Display.drawString("Check order: Pressure -> Humidity -> Light", UI_MARGIN_X + 18, 698, &fonts::Font2);
   M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), UI_MARGIN_X + 18, 718, &fonts::Font4);
-  M5.Display.drawString(signalPatternSummary(pArrow, hArrow, lArrow, lightActive), UI_MARGIN_X + 18, 742, &fonts::Font2);
-  M5.Display.drawString(lightActive ? "Rain clue: P v  H ^  L v   Fair clue: P ^  H v  L ^"
-                                   : "At night use P + H. Light is a daytime clue.",
-                        UI_MARGIN_X + 18, 764, &fonts::Font2);
+  drawPatternSummaryRow(UI_MARGIN_X + 18, 742, "Now:", pArrow, hArrow, lArrow, lightActive, false);
+  drawPatternSummaryRow(UI_MARGIN_X + 18, 764, "Clue:", pArrow, hArrow, lArrow, lightActive, true);
   M5.Display.drawString("What changed first?", UI_MARGIN_X + 18, 786, &fonts::Font2);
   M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X - 34, 786, &fonts::Font2);
 
