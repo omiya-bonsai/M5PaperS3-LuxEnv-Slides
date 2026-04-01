@@ -12,3 +12,5 @@ static constexpr uint16_t    MQTT_PORT   = 1883;
 static constexpr const char* CONFIG_NTP_SERVER_1 = "ntp.nict.jp";
 static constexpr const char* CONFIG_NTP_SERVER_2 = "pool.ntp.org";
 static constexpr const char* CONFIG_TZ_INFO      = "JST-9";
+static constexpr double CONFIG_SITE_LATITUDE     = 35.8617;
+static constexpr double CONFIG_SITE_LONGITUDE    = 139.6455;

@@ -41,6 +41,8 @@ static constexpr uint32_t STATE_SAVE_MS        = 30000;
 static constexpr size_t HISTORY_CAP = 300;  // Covers ~150 min at 30 s lux updates.
 static constexpr uint32_t SHORT_WINDOW_MIN = 15;
 static constexpr uint32_t LONG_WINDOW_MIN = 120;
+static constexpr uint32_t NIGHT_LUX_WINDOW_MIN = 10;
+static constexpr float NIGHT_LUX_THRESHOLD = 5.0f;
 static constexpr uint8_t MAIN_SLIDE_COUNT = 4;
 static constexpr uint8_t STATUS_SCREEN_INDEX = 4;
 
@@ -698,6 +700,92 @@ String formatClockOnly(uint32_t ts) {
   return String(buf);
 }
 
+double normalizeDegrees(double deg) {
+  while (deg < 0.0) deg += 360.0;
+  while (deg >= 360.0) deg -= 360.0;
+  return deg;
+}
+
+double degToRad(double deg) {
+  return deg * PI / 180.0;
+}
+
+double radToDeg(double rad) {
+  return rad * 180.0 / PI;
+}
+
+int computeSunEventMinuteJst(uint32_t ts, bool sunrise) {
+  if (ts == 0) return sunrise ? 360 : 1080;
+
+  time_t localTs = static_cast<time_t>(ts + 9 * 3600UL);
+  struct tm tmLocal;
+  gmtime_r(&localTs, &tmLocal);
+  int dayOfYear = tmLocal.tm_yday + 1;
+
+  double lngHour = CONFIG_SITE_LONGITUDE / 15.0;
+  double t = dayOfYear + ((sunrise ? 6.0 : 18.0) - lngHour) / 24.0;
+  double M = (0.9856 * t) - 3.289;
+  double L = normalizeDegrees(M + (1.916 * sin(degToRad(M))) + (0.020 * sin(2 * degToRad(M))) + 282.634);
+
+  double RA = radToDeg(atan(0.91764 * tan(degToRad(L))));
+  RA = normalizeDegrees(RA);
+  double Lquadrant = floor(L / 90.0) * 90.0;
+  double RAquadrant = floor(RA / 90.0) * 90.0;
+  RA = (RA + (Lquadrant - RAquadrant)) / 15.0;
+
+  double sinDec = 0.39782 * sin(degToRad(L));
+  double cosDec = cos(asin(sinDec));
+  double cosH = (cos(degToRad(90.833)) - (sinDec * sin(degToRad(CONFIG_SITE_LATITUDE))))
+              / (cosDec * cos(degToRad(CONFIG_SITE_LATITUDE)));
+
+  if (cosH > 1.0) return sunrise ? 360 : 1080;
+  if (cosH < -1.0) return sunrise ? 0 : 1439;
+
+  double H = sunrise ? (360.0 - radToDeg(acos(cosH))) : radToDeg(acos(cosH));
+  H /= 15.0;
+
+  double T = H + RA - (0.06571 * t) - 6.622;
+  double UT = T - lngHour;
+  while (UT < 0.0) UT += 24.0;
+  while (UT >= 24.0) UT -= 24.0;
+
+  double localHour = UT + 9.0;
+  while (localHour < 0.0) localHour += 24.0;
+  while (localHour >= 24.0) localHour -= 24.0;
+  return (int)round(localHour * 60.0);
+}
+
+bool isNightCandidate(uint32_t ts) {
+  if (ts == 0) return false;
+  time_t localTs = static_cast<time_t>(ts + 9 * 3600UL);
+  struct tm tmLocal;
+  gmtime_r(&localTs, &tmLocal);
+  int nowMin = tmLocal.tm_hour * 60 + tmLocal.tm_min;
+  int sunriseMin = computeSunEventMinuteJst(ts, true);
+  int sunsetMin = computeSunEventMinuteJst(ts, false);
+  return nowMin < sunriseMin || nowMin >= sunsetMin;
+}
+
+bool isLuxDarkSustained(uint32_t windowMin, float threshold) {
+  if (g_luxHist.count == 0) return false;
+  uint32_t newestTs = g_luxHist.at(g_luxHist.count - 1).ts;
+  uint32_t cutoffTs = (newestTs > windowMin * 60) ? (newestTs - windowMin * 60) : 0;
+  size_t samples = 0;
+  for (size_t i = 0; i < g_luxHist.count; ++i) {
+    const auto& point = g_luxHist.at(i);
+    if (point.ts < cutoffTs) continue;
+    ++samples;
+    if (point.lux > threshold) return false;
+  }
+  return samples >= 3;
+}
+
+bool isLightRainFactorActive() {
+  uint32_t liveTs = g_liveDisplayTs > 0 ? g_liveDisplayTs : (uint32_t)safeLatestTs();
+  if (!isNightCandidate(liveTs)) return true;
+  return !isLuxDarkSustained(NIGHT_LUX_WINDOW_MIN, NIGHT_LUX_THRESHOLD);
+}
+
 size_t collectEnvWindow(float* pressureVals, float* humidityVals, uint32_t* tsVals, uint32_t windowMin) {
   if (g_envHist.count == 0) return 0;
 
@@ -745,12 +833,14 @@ const char* trendLabel(const char* trend) {
 }
 
 const char* signalGlyph(const String& signal) {
+  if (signal == "NIGHT") return "NIGHT";
   if (signal == "UP") return "ASCEND";
   if (signal == "DOWN") return "DESCEND";
   return "STEADY";
 }
 
 const MonoIcon& signalIcon(const String& signal) {
+  if (signal == "NIGHT") return ICON_CLOCK;
   if (signal == "UP") return ICON_ARROW_UP;
   if (signal == "DOWN") return ICON_ARROW_DOWN;
   return ICON_ARROW_STEADY;
@@ -774,6 +864,7 @@ const char* signalMeaning(const char* label, const String& signal) {
     if (signal == "DOWN") return "dry sign";
     return "watch";
   }
+  if (signal == "NIGHT") return "night skip";
   if (signal == "DOWN") return "cloud sign";
   if (signal == "UP") return "bright sign";
   return "watch";
@@ -936,9 +1027,12 @@ void drawSlideSummary() {
   String pArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).pressure - g_envHist.at(0).pressure : NAN);
   String hArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).humidity - g_envHist.at(0).humidity : NAN);
   String lArrow = arrowForDelta(g_luxMeta.delta);
+  bool lightActive = isLightRainFactorActive();
+  String lightDisplay = lightActive ? lArrow : String("NIGHT");
+  int rainDenom = lightActive ? 3 : 2;
   int rainSigns = (isRainSign("PRESSURE", pArrow) ? 1 : 0) +
                   (isRainSign("HUMIDITY", hArrow) ? 1 : 0) +
-                  (isRainSign("LIGHT", lArrow) ? 1 : 0);
+                  ((lightActive && isRainSign("LIGHT", lArrow)) ? 1 : 0);
 
   drawCard(UI_MARGIN_X, currentY, cardW, currentH, "CURRENT VALUES");
   drawMetricWithIcon(ICON_TEMP, "TEMP", formatFloat1(g_env4.temperature), "C", innerX, 126, leftUnitX);
@@ -949,12 +1043,14 @@ void drawSlideSummary() {
   drawCard(UI_MARGIN_X, changeY, cardW, changeH, "RECENT CHANGES");
   drawChangeSummaryRow(ICON_PRESSURE, "PRESSURE", pArrow, 516);
   drawChangeSummaryRow(ICON_HUMIDITY, "HUMIDITY", hArrow, 578);
-  drawChangeSummaryRow(ICON_LIGHT, "LIGHT", lArrow, 640);
+  drawChangeSummaryRow(ICON_LIGHT, "LIGHT", lightDisplay, 640);
   M5.Display.drawLine(innerX, 708, UI_MARGIN_X + cardW - 20, 708, TFT_BLACK);
   M5.Display.drawString("LUX RATE (vs avg, last 6 min)", innerX, 728, &fonts::Font2);
   M5.Display.drawRightString(formatFloat2(g_luxMeta.rate_pct) + " %", UI_MARGIN_X + cardW - 20, 726, &fonts::Font4);
-  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / 3", innerX, 768, &fonts::Font4);
-  M5.Display.drawString("Pressure down + humidity up + light down are clues.", innerX, 798, &fonts::Font2);
+  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), innerX, 768, &fonts::Font4);
+  M5.Display.drawString(lightActive ? "Pressure down + humidity up + light down are clues."
+                                   : "Night mode: light is skipped after sustained darkness.",
+                        innerX, 798, &fonts::Font2);
 
   drawFooter();
 }
@@ -965,17 +1061,22 @@ void drawSlideSignals() {
   String pArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).pressure - g_envHist.at(0).pressure : NAN);
   String hArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).humidity - g_envHist.at(0).humidity : NAN);
   String lArrow = arrowForDelta(g_luxMeta.delta);
+  bool lightActive = isLightRainFactorActive();
+  String lightDisplay = lightActive ? lArrow : String("NIGHT");
+  int rainDenom = lightActive ? 3 : 2;
   int rainSigns = (isRainSign("PRESSURE", pArrow) ? 1 : 0) +
                   (isRainSign("HUMIDITY", hArrow) ? 1 : 0) +
-                  (isRainSign("LIGHT", lArrow) ? 1 : 0);
+                  ((lightActive && isRainSign("LIGHT", lArrow)) ? 1 : 0);
 
   drawSignalRow(ICON_PRESSURE, "PRESSURE", pArrow, normalizedPressureTrend(), 102);
   drawSignalRow(ICON_HUMIDITY, "HUMIDITY", hArrow, normalizedHumidityTrend(), 286);
-  drawSignalRow(ICON_LIGHT, "LIGHT", lArrow, normalizedLuxTrend(), 470);
+  drawSignalRow(ICON_LIGHT, "LIGHT", lightDisplay, lightActive ? normalizedLuxTrend() : 0.0f, 470);
 
   drawCard(UI_MARGIN_X, 676, M5.Display.width() - UI_MARGIN_X * 2, 132, "INTERPRET");
-  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / 3", UI_MARGIN_X + 18, 716, &fonts::Font4);
-  M5.Display.drawString("Pressure down + humidity up + light down are clues.", UI_MARGIN_X + 18, 744, &fonts::Font2);
+  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), UI_MARGIN_X + 18, 716, &fonts::Font4);
+  M5.Display.drawString(lightActive ? "Pressure down + humidity up + light down are clues."
+                                   : "Night mode: light is skipped after sustained darkness.",
+                        UI_MARGIN_X + 18, 744, &fonts::Font2);
   M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X - 28, 776, &fonts::Font4);
 
   drawFooter();
