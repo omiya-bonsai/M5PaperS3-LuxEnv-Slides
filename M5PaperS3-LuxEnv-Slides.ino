@@ -1071,9 +1071,16 @@ void drawSignalRow(const MonoIcon& icon, const char* label, const String& signal
   M5.Display.drawLine(UI_MARGIN_X, y + 148, M5.Display.width() - UI_MARGIN_X, y + 148, TFT_BLACK);
 }
 
+size_t sampledIndex(size_t outIdx, size_t sourceCount, size_t targetCount) {
+  if (sourceCount == 0 || targetCount == 0) return 0;
+  if (targetCount >= sourceCount || targetCount == 1) return (targetCount == 1) ? (sourceCount - 1) : outIdx;
+  return (outIdx * (sourceCount - 1) + (targetCount - 1) / 2) / (targetCount - 1);
+}
+
 void drawSimpleLineGraphFloat(int x, int y, int w, int h, const MonoIcon& icon,
                               const float* vals, size_t n, const char* title, const char* unit,
-                              const String& startLabel, const String& endLabel) {
+                              const String& startLabel, const String& endLabel,
+                              size_t maxRenderPoints, bool drawAllMarkers) {
   M5.Display.drawRect(x, y, w, h, TFT_BLACK);
   drawMonoIcon(x + 6, y + 4, icon, 1);
   M5.Display.drawString(title, x + 30, y + 4, &fonts::Font2);
@@ -1108,18 +1115,32 @@ void drawSimpleLineGraphFloat(int x, int y, int w, int h, const MonoIcon& icon,
   int gy = y + 24;
   int gw = w - 20;
   int gh = h - 36;
+  size_t renderN = n;
+  if (maxRenderPoints >= 2 && renderN > maxRenderPoints) {
+    renderN = maxRenderPoints;
+  }
 
   int prevX = -1;
   int prevY = -1;
-  for (size_t i = 0; i < n; ++i) {
-    float v = vals[i];
+  int lastPx = -1;
+  int lastPy = -1;
+  for (size_t i = 0; i < renderN; ++i) {
+    size_t sourceIdx = sampledIndex(i, n, renderN);
+    float v = vals[sourceIdx];
     if (isnan(v)) continue;
-    int px = gx + (int)((float)i / (float)(n - 1) * gw);
+    int px = gx + (int)((float)i / (float)(renderN - 1) * gw);
     int py = gy + gh - (int)(((v - vMin) / (vMax - vMin)) * gh);
     if (prevX >= 0) M5.Display.drawLine(prevX, prevY, px, py, TFT_BLACK);
-    M5.Display.fillCircle(px, py, 2, TFT_BLACK);
+    if (drawAllMarkers) {
+      M5.Display.fillCircle(px, py, 2, TFT_BLACK);
+    }
     prevX = px;
     prevY = py;
+    lastPx = px;
+    lastPy = py;
+  }
+  if (!drawAllMarkers && lastPx >= 0) {
+    M5.Display.fillCircle(lastPx, lastPy, 2, TFT_BLACK);
   }
 }
 
@@ -1213,15 +1234,21 @@ void drawTrendGraphsSlide(const char* title, uint32_t targetWindowMin) {
     if (g_luxGraphTs[luxN - 1] > newestTs) newestTs = g_luxGraphTs[luxN - 1];
   }
   uint32_t spanMin = (oldestTs > 0 && newestTs > oldestTs) ? ((newestTs - oldestTs) / 60) : 0;
+  bool compressed = targetWindowMin >= LONG_WINDOW_MIN;
+  size_t maxRenderPoints = compressed ? 48 : HISTORY_CAP;
+  bool drawAllMarkers = !compressed;
 
   String startLabel = formatClockOnly(oldestTs);
   String endLabel = formatClockOnly(newestTs);
   drawSimpleLineGraphFloat(UI_MARGIN_X, 92, M5.Display.width() - UI_MARGIN_X * 2, 188,
-                           ICON_PRESSURE, g_pressureGraphVals, envN, "PRESSURE", "hPa", startLabel, endLabel);
+                           ICON_PRESSURE, g_pressureGraphVals, envN, "PRESSURE", "hPa",
+                           startLabel, endLabel, maxRenderPoints, drawAllMarkers);
   drawSimpleLineGraphFloat(UI_MARGIN_X, 302, M5.Display.width() - UI_MARGIN_X * 2, 188,
-                           ICON_HUMIDITY, g_humidityGraphVals, envN, "HUMIDITY", "%", startLabel, endLabel);
+                           ICON_HUMIDITY, g_humidityGraphVals, envN, "HUMIDITY", "%",
+                           startLabel, endLabel, maxRenderPoints, drawAllMarkers);
   drawSimpleLineGraphFloat(UI_MARGIN_X, 512, M5.Display.width() - UI_MARGIN_X * 2, 188,
-                           ICON_LIGHT, g_luxGraphVals, luxN, "LUX", "", startLabel, endLabel);
+                           ICON_LIGHT, g_luxGraphVals, luxN, "LUX", "",
+                           startLabel, endLabel, maxRenderPoints, drawAllMarkers);
 
   M5.Display.drawLine(UI_MARGIN_X, 726, M5.Display.width() - UI_MARGIN_X, 726, TFT_BLACK);
   M5.Display.drawString("NOW", UI_MARGIN_X + 4, 744, &fonts::Font2);
