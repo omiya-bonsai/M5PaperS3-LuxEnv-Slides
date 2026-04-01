@@ -6,6 +6,7 @@
 #include <time.h>
 
 #include "config.h"
+#include "icons.h"
 
 // ============================================================
 // M5PaperS3 MQTT Slide Dashboard
@@ -587,6 +588,60 @@ void drawSummaryRow(const char* label, const String& value, int x, int y) {
   M5.Display.drawRightString(value, M5.Display.width() - UI_MARGIN_X - 8, y, &fonts::Font4);
 }
 
+void drawMonoIcon(int x, int y, const MonoIcon& icon, int scale = 1) {
+  const int bytesPerRow = (icon.width + 7) / 8;
+  for (int row = 0; row < icon.height; ++row) {
+    for (int col = 0; col < icon.width; ++col) {
+      uint8_t bits = pgm_read_byte(icon.data + row * bytesPerRow + (col / 8));
+      if (bits & (0x80 >> (col % 8))) {
+        M5.Display.fillRect(x + col * scale, y + row * scale, scale, scale, TFT_BLACK);
+      }
+    }
+  }
+}
+
+void drawLabeledIcon(const MonoIcon& icon, const char* label, int x, int y, int scale = 1) {
+  drawMonoIcon(x, y, icon, scale);
+  M5.Display.drawString(label, x + icon.width * scale + 8, y + 2, &fonts::Font2);
+}
+
+void drawMetricWithIcon(const MonoIcon& icon, const char* label, const String& value, const String& unit,
+                        int x, int y, int unitX) {
+  drawMonoIcon(x, y + 2, icon, 1);
+  M5.Display.drawString(label, x + 24, y + 2, &fonts::Font2);
+  M5.Display.drawString(value, x, y + 28, &fonts::Font6);
+  if (unit.length() > 0) {
+    M5.Display.drawString(unit, unitX, y + 50, &fonts::Font2);
+  }
+}
+
+void drawSummaryIconRow(const MonoIcon& icon, const char* label, const String& value, int x, int y) {
+  drawMonoIcon(x, y - 2, icon, 1);
+  M5.Display.drawString(label, x + 24, y, &fonts::Font2);
+  M5.Display.drawRightString(value, M5.Display.width() - UI_MARGIN_X - 8, y, &fonts::Font4);
+}
+
+void drawSummaryMetric(const char* label, const String& value, const String& unit,
+                       int x, int y, int valueW, int unitGap = 10) {
+  M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
+  M5.Display.drawString(label, x, y, &fonts::Font2);
+  M5.Display.drawString(value, x, y + 18, &fonts::Font6);
+  if (unit.length() > 0) {
+    M5.Display.drawString(unit, x + valueW + unitGap, y + 40, &fonts::Font2);
+  }
+}
+
+String formatClockOnly(uint32_t ts) {
+  if (ts == 0) return "--:--";
+  time_t t = static_cast<time_t>(ts);
+  struct tm tmLocal;
+  localtime_r(&t, &tmLocal);
+
+  char buf[16];
+  snprintf(buf, sizeof(buf), "%02d:%02d", tmLocal.tm_hour, tmLocal.tm_min);
+  return String(buf);
+}
+
 void drawCard(int x, int y, int w, int h, const char* title) {
   M5.Display.drawRect(x, y, w, h, TFT_BLACK);
   M5.Display.drawString(title, x + 10, y + 10, &fonts::Font2);
@@ -600,19 +655,47 @@ const char* trendLabel(const char* trend) {
   return "STABLE";
 }
 
-void drawTrendBadge(const char* trend, int x, int y) {
-  const int w = 240;
-  const int h = 46;
-  M5.Display.fillRect(x, y, w, h, TFT_BLACK);
-  M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
-  M5.Display.drawCentreString(trendLabel(trend), x + w / 2, y + 12, &fonts::Font2);
-  M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
-}
-
 const char* signalGlyph(const String& signal) {
   if (signal == "UP") return "ASCEND";
   if (signal == "DOWN") return "DESCEND";
   return "STEADY";
+}
+
+const MonoIcon& signalIcon(const String& signal) {
+  if (signal == "UP") return ICON_ARROW_UP;
+  if (signal == "DOWN") return ICON_ARROW_DOWN;
+  return ICON_ARROW_STEADY;
+}
+
+bool isRainSign(const char* label, const String& signal) {
+  if (strcmp(label, "PRESSURE") == 0) return signal == "DOWN";
+  if (strcmp(label, "HUMIDITY") == 0) return signal == "UP";
+  if (strcmp(label, "LIGHT") == 0) return signal == "DOWN";
+  return false;
+}
+
+const char* signalMeaning(const char* label, const String& signal) {
+  if (strcmp(label, "PRESSURE") == 0) {
+    if (signal == "DOWN") return "rain sign";
+    if (signal == "UP") return "fair sign";
+    return "watch";
+  }
+  if (strcmp(label, "HUMIDITY") == 0) {
+    if (signal == "UP") return "rain sign";
+    if (signal == "DOWN") return "dry sign";
+    return "watch";
+  }
+  if (signal == "DOWN") return "cloud sign";
+  if (signal == "UP") return "bright sign";
+  return "watch";
+}
+
+void drawChangeSummaryRow(const MonoIcon& icon, const char* label, const String& signal, int y) {
+  drawMonoIcon(UI_MARGIN_X + 22, y + 2, icon, 1);
+  M5.Display.drawString(label, UI_MARGIN_X + 46, y, &fonts::Font2);
+  M5.Display.drawString(signalGlyph(signal), UI_MARGIN_X + 220, y, &fonts::Font4);
+  drawMonoIcon(UI_MARGIN_X + 370, y - 2, signalIcon(signal), 1);
+  M5.Display.drawRightString(signalMeaning(label, signal), M5.Display.width() - UI_MARGIN_X - 20, y, &fonts::Font2);
 }
 
 float clamp01(float v) {
@@ -681,20 +764,25 @@ float normalizedLuxTrend() {
   return normalizedRate(g_luxMeta.rate_pct);
 }
 
-void drawSignalRow(const char* label, const String& signal, float gaugeValue, int y) {
-  const int labelX = UI_MARGIN_X + 8;
-  const int stateX = 220;
-  const int gaugeX = UI_MARGIN_X + 8;
-  const int gaugeW = M5.Display.width() - UI_MARGIN_X * 2 - 16;
-  M5.Display.drawString(label, labelX, y + 6, &fonts::Font2);
-  M5.Display.drawString(signalGlyph(signal), stateX, y + 32, &fonts::Font4);
-  drawCenteredGauge(gaugeX, y + 92, gaugeW, 24, gaugeValue);
-  M5.Display.drawLine(UI_MARGIN_X, y + 154, M5.Display.width() - UI_MARGIN_X, y + 154, TFT_BLACK);
+void drawSignalRow(const MonoIcon& icon, const char* label, const String& signal, float gaugeValue, int y) {
+  const int labelX = UI_MARGIN_X + 10;
+  const int stateX = UI_MARGIN_X + 10;
+  const int gaugeX = UI_MARGIN_X + 10;
+  const int gaugeW = M5.Display.width() - UI_MARGIN_X * 2 - 20;
+  drawLabeledIcon(icon, label, labelX, y + 4);
+  M5.Display.drawString(signalGlyph(signal), stateX, y + 38, &fonts::Font4);
+  drawMonoIcon(M5.Display.width() - UI_MARGIN_X - 30, y + 34, signalIcon(signal), 1);
+  M5.Display.drawRightString(signalMeaning(label, signal), M5.Display.width() - UI_MARGIN_X - 48, y + 40, &fonts::Font2);
+  drawCenteredGauge(gaugeX, y + 98, gaugeW, 22, gaugeValue);
+  M5.Display.drawLine(UI_MARGIN_X, y + 148, M5.Display.width() - UI_MARGIN_X, y + 148, TFT_BLACK);
 }
 
-void drawSimpleLineGraphFloat(int x, int y, int w, int h, const float* vals, size_t n, const char* title, const char* unit) {
+void drawSimpleLineGraphFloat(int x, int y, int w, int h, const MonoIcon& icon,
+                              const float* vals, size_t n, const char* title, const char* unit,
+                              const String& startLabel, const String& endLabel) {
   M5.Display.drawRect(x, y, w, h, TFT_BLACK);
-  M5.Display.drawString(title, x + 6, y + 4, &fonts::Font2);
+  drawMonoIcon(x + 6, y + 4, icon, 1);
+  M5.Display.drawString(title, x + 30, y + 4, &fonts::Font2);
 
   if (n < 2) {
     M5.Display.drawCentreString("NO DATA", x + w / 2, y + h / 2 - 8, &fonts::Font2);
@@ -718,7 +806,9 @@ void drawSimpleLineGraphFloat(int x, int y, int w, int h, const float* vals, siz
   snprintf(bufMin, sizeof(bufMin), "%.1f %s", vMin, unit);
 
   M5.Display.drawRightString(bufMax, x + w - 6, y + 4, &fonts::Font2);
-  M5.Display.drawRightString(bufMin, x + w - 6, y + h - 20, &fonts::Font2);
+  M5.Display.drawRightString(bufMin, x + w - 6, y + h - 36, &fonts::Font2);
+  M5.Display.drawString(startLabel, x + 6, y + h - 18, &fonts::Font2);
+  M5.Display.drawRightString(endLabel, x + w - 6, y + h - 18, &fonts::Font2);
 
   int gx = x + 10;
   int gy = y + 24;
@@ -741,20 +831,41 @@ void drawSimpleLineGraphFloat(int x, int y, int w, int h, const float* vals, siz
 
 void drawSlideSummary() {
   drawHeader("SLIDE 1  CURRENT");
-  drawCard(UI_MARGIN_X, 92, M5.Display.width() - UI_MARGIN_X * 2, 352, "CURRENT VALUES");
-  drawMetricBlock("TEMP", formatFloat1(g_env4.temperature), "C", UI_MARGIN_X + 20, 128, 116);
-  drawMetricBlock("HUM", formatFloat1(g_env4.humidity), "%", UI_MARGIN_X + 20, 234, 116);
-  drawMetricBlock("PRES", formatFloat1(g_env4.pressure), "hPa", UI_MARGIN_X + 20, 340, 132);
-  drawMetricBlock("LUX", formatFloat1(g_luxRaw.lux), "", 294, 128, 0);
+  const int cardW = M5.Display.width() - UI_MARGIN_X * 2;
+  const int currentY = 92;
+  const int currentH = 352;
+  const int changeY = 468;
+  const int changeH = 406;
+  const int innerX = UI_MARGIN_X + 20;
+  const int innerW = cardW - 40;
+  const int colGap = 34;
+  const int colW = (innerW - colGap) / 2;
+  const int rightColX = innerX + colW + colGap;
+  const int leftUnitX = innerX + 108;
+  const int rightUnitX = rightColX + 164;
 
-  drawCard(UI_MARGIN_X, 468, M5.Display.width() - UI_MARGIN_X * 2, 386, "LUX CHANGE");
-  M5.Display.drawString("TREND", UI_MARGIN_X + 20, 510, &fonts::Font2);
-  drawTrendBadge(g_luxMeta.trend, UI_MARGIN_X + 20, 536);
-  drawTextRowAligned("RATE", formatFloat2(g_luxMeta.rate_pct) + " %", UI_MARGIN_X + 20, M5.Display.width() - UI_MARGIN_X - 20, 622, &fonts::Font4);
-  drawCenteredGauge(UI_MARGIN_X + 20, 658, M5.Display.width() - UI_MARGIN_X * 2 - 40, 24, normalizedRate(g_luxMeta.rate_pct));
-  drawTextRowAligned("NOW VS AVG (last 6 min)", formatFloat1(g_luxMeta.delta), UI_MARGIN_X + 20, M5.Display.width() - UI_MARGIN_X - 20, 734, &fonts::Font4);
-  drawCenteredGauge(UI_MARGIN_X + 20, 770, M5.Display.width() - UI_MARGIN_X * 2 - 40, 24, normalizedRate(g_luxMeta.delta));
-  M5.Display.drawString("moving average of last 12 samples", UI_MARGIN_X + 20, 818, &fonts::Font2);
+  String pArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).pressure - g_envHist.at(0).pressure : NAN);
+  String hArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).humidity - g_envHist.at(0).humidity : NAN);
+  String lArrow = arrowForDelta(g_luxMeta.delta);
+  int rainSigns = (isRainSign("PRESSURE", pArrow) ? 1 : 0) +
+                  (isRainSign("HUMIDITY", hArrow) ? 1 : 0) +
+                  (isRainSign("LIGHT", lArrow) ? 1 : 0);
+
+  drawCard(UI_MARGIN_X, currentY, cardW, currentH, "CURRENT VALUES");
+  drawMetricWithIcon(ICON_TEMP, "TEMP", formatFloat1(g_env4.temperature), "C", innerX, 126, leftUnitX);
+  drawMetricWithIcon(ICON_LIGHT, "LUX", formatFloat1(g_luxRaw.lux), "", rightColX, 126, 0);
+  drawMetricWithIcon(ICON_HUMIDITY, "HUM", formatFloat1(g_env4.humidity), "%", innerX, 262, leftUnitX);
+  drawMetricWithIcon(ICON_PRESSURE, "PRES", formatFloat1(g_env4.pressure), "hPa", rightColX, 262, rightUnitX);
+
+  drawCard(UI_MARGIN_X, changeY, cardW, changeH, "RECENT CHANGES");
+  drawChangeSummaryRow(ICON_PRESSURE, "PRESSURE", pArrow, 516);
+  drawChangeSummaryRow(ICON_HUMIDITY, "HUMIDITY", hArrow, 578);
+  drawChangeSummaryRow(ICON_LIGHT, "LIGHT", lArrow, 640);
+  M5.Display.drawLine(innerX, 708, UI_MARGIN_X + cardW - 20, 708, TFT_BLACK);
+  M5.Display.drawString("LUX RATE (vs avg, last 6 min)", innerX, 728, &fonts::Font2);
+  M5.Display.drawRightString(formatFloat2(g_luxMeta.rate_pct) + " %", UI_MARGIN_X + cardW - 20, 726, &fonts::Font4);
+  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / 3", innerX, 774, &fonts::Font4);
+  M5.Display.drawString("Pressure down + humidity up + light down are clues.", innerX, 808, &fonts::Font2);
 
   drawFooter();
 }
@@ -765,13 +876,18 @@ void drawSlideSignals() {
   String pArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).pressure - g_envHist.at(0).pressure : NAN);
   String hArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).humidity - g_envHist.at(0).humidity : NAN);
   String lArrow = arrowForDelta(g_luxMeta.delta);
+  int rainSigns = (isRainSign("PRESSURE", pArrow) ? 1 : 0) +
+                  (isRainSign("HUMIDITY", hArrow) ? 1 : 0) +
+                  (isRainSign("LIGHT", lArrow) ? 1 : 0);
 
-  drawSignalRow("PRESSURE", pArrow, normalizedPressureTrend(), 100);
-  drawSignalRow("HUMIDITY", hArrow, normalizedHumidityTrend(), 302);
-  drawSignalRow("LIGHT", lArrow, normalizedLuxTrend(), 504);
+  drawSignalRow(ICON_PRESSURE, "PRESSURE", pArrow, normalizedPressureTrend(), 102);
+  drawSignalRow(ICON_HUMIDITY, "HUMIDITY", hArrow, normalizedHumidityTrend(), 286);
+  drawSignalRow(ICON_LIGHT, "LIGHT", lArrow, normalizedLuxTrend(), 470);
 
-  M5.Display.drawString("QUESTION", UI_MARGIN_X + 10, 742, &fonts::Font2);
-  M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X, 736, &fonts::Font4);
+  drawCard(UI_MARGIN_X, 676, M5.Display.width() - UI_MARGIN_X * 2, 132, "INTERPRET");
+  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / 3", UI_MARGIN_X + 18, 722, &fonts::Font4);
+  M5.Display.drawString("Pressure down + humidity up + light down are clues.", UI_MARGIN_X + 18, 756, &fonts::Font2);
+  M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X - 18, 754, &fonts::Font4);
 
   drawFooter();
 }
@@ -794,41 +910,70 @@ void drawSlideGraphs() {
     luxVals[i] = g_luxHist.at(i).lux;
   }
 
-  drawSimpleLineGraphFloat(UI_MARGIN_X, 92, M5.Display.width() - UI_MARGIN_X * 2, 188, pressureVals, envN, "PRESSURE", "hPa");
-  drawSimpleLineGraphFloat(UI_MARGIN_X, 302, M5.Display.width() - UI_MARGIN_X * 2, 188, humidityVals, envN, "HUMIDITY", "%");
-  drawSimpleLineGraphFloat(UI_MARGIN_X, 512, M5.Display.width() - UI_MARGIN_X * 2, 188, luxVals, luxN, "LUX", "");
+  uint32_t oldestTs = 0;
+  uint32_t newestTs = 0;
+  if (envN > 0) {
+    oldestTs = g_envHist.at(0).ts;
+    newestTs = g_envHist.at(envN - 1).ts;
+  } else if (luxN > 0) {
+    oldestTs = g_luxHist.at(0).ts;
+    newestTs = g_luxHist.at(luxN - 1).ts;
+  }
+  uint32_t spanMin = (oldestTs > 0 && newestTs > oldestTs) ? ((newestTs - oldestTs) / 60) : 0;
 
-  M5.Display.drawLine(UI_MARGIN_X, 728, M5.Display.width() - UI_MARGIN_X, 728, TFT_BLACK);
-  M5.Display.drawString("NOW", UI_MARGIN_X + 4, 748, &fonts::Font2);
-  drawSummaryRow("PRES", formatFloat1(g_env4.pressure) + " hPa", UI_MARGIN_X + 16, 780);
-  drawSummaryRow("HUM", formatFloat1(g_env4.humidity) + " %", UI_MARGIN_X + 16, 812);
-  drawSummaryRow("LUX", formatFloat1(g_luxRaw.lux), UI_MARGIN_X + 16, 844);
+  String startLabel = formatClockOnly(oldestTs);
+  String endLabel = formatClockOnly(newestTs);
+  drawSimpleLineGraphFloat(UI_MARGIN_X, 92, M5.Display.width() - UI_MARGIN_X * 2, 188,
+                           ICON_PRESSURE, pressureVals, envN, "PRESSURE", "hPa", startLabel, endLabel);
+  drawSimpleLineGraphFloat(UI_MARGIN_X, 302, M5.Display.width() - UI_MARGIN_X * 2, 188,
+                           ICON_HUMIDITY, humidityVals, envN, "HUMIDITY", "%", startLabel, endLabel);
+  drawSimpleLineGraphFloat(UI_MARGIN_X, 512, M5.Display.width() - UI_MARGIN_X * 2, 188,
+                           ICON_LIGHT, luxVals, luxN, "LUX", "", startLabel, endLabel);
+
+  M5.Display.drawLine(UI_MARGIN_X, 726, M5.Display.width() - UI_MARGIN_X, 726, TFT_BLACK);
+  M5.Display.drawString("NOW", UI_MARGIN_X + 4, 744, &fonts::Font2);
+  M5.Display.drawRightString(String("WINDOW ") + formatClockOnly(oldestTs) + " - " + formatClockOnly(newestTs) +
+                             "  (" + String(spanMin) + " min)",
+                             M5.Display.width() - UI_MARGIN_X, 744, &fonts::Font2);
+  drawSummaryIconRow(ICON_PRESSURE, "PRES", formatFloat1(g_env4.pressure) + " hPa", UI_MARGIN_X + 16, 776);
+  drawSummaryIconRow(ICON_HUMIDITY, "HUM", formatFloat1(g_env4.humidity) + " %", UI_MARGIN_X + 16, 808);
+  drawSummaryIconRow(ICON_LIGHT, "LUX", formatFloat1(g_luxRaw.lux), UI_MARGIN_X + 16, 840);
 
   drawFooter();
 }
 
 void drawSlideStatus() {
   drawHeader("SLIDE 4  STATUS");
+  const int cardW = M5.Display.width() - UI_MARGIN_X * 2;
+  const int healthX = UI_MARGIN_X + 18;
+  const int healthRight = M5.Display.width() - UI_MARGIN_X - 22;
+  const int networkX = UI_MARGIN_X + 18;
+  const int networkRight = M5.Display.width() - UI_MARGIN_X - 22;
 
-  drawCard(UI_MARGIN_X, 92, M5.Display.width() - UI_MARGIN_X * 2, 268, "HEALTH");
+  drawCard(UI_MARGIN_X, 92, cardW, 252, "HEALTH");
+  drawMonoIcon(M5.Display.width() - UI_MARGIN_X - 38, 102, ICON_SENSOR, 1);
   drawTextRowAligned("SENSOR", String(g_luxStatus.sensor_ready ? "READY" : "FAIL"),
-                     UI_MARGIN_X + 18, M5.Display.width() - UI_MARGIN_X - 20, 144, &fonts::Font4);
+                     healthX, healthRight - 28, 156, &fonts::Font4);
   drawTextRowAligned("STATUS", String(g_luxStatus.status),
-                     UI_MARGIN_X + 18, M5.Display.width() - UI_MARGIN_X - 20, 220, &fonts::Font4);
+                     healthX, healthRight - 28, 214, &fonts::Font4);
   drawTextRowAligned("REASON", String(g_luxStatus.reason),
-                     UI_MARGIN_X + 18, M5.Display.width() - UI_MARGIN_X - 20, 296, &fonts::Font4);
+                     healthX, healthRight - 28, 272, &fonts::Font4);
 
-  drawCard(UI_MARGIN_X, 392, M5.Display.width() - UI_MARGIN_X * 2, 462, "NETWORK");
+  drawCard(UI_MARGIN_X, 370, cardW, 396, "NETWORK");
+  drawMonoIcon(M5.Display.width() - UI_MARGIN_X - 38, 380, ICON_WIFI, 1);
   drawTextRowAligned("WIFI", String(g_luxStatus.wifi),
-                     UI_MARGIN_X + 18, M5.Display.width() - UI_MARGIN_X - 20, 444, &fonts::Font4);
+                     networkX, networkRight - 28, 432, &fonts::Font4);
   drawTextRowAligned("IP", String(g_luxStatus.ip),
-                     UI_MARGIN_X + 18, M5.Display.width() - UI_MARGIN_X - 20, 530, &fonts::Font4);
+                     networkX, networkRight - 28, 486, &fonts::Font4);
   drawTextRowAligned("ERR CNT", String(g_luxStatus.sensor_error_count),
-                     UI_MARGIN_X + 18, M5.Display.width() - UI_MARGIN_X - 20, 616, &fonts::Font4);
+                     networkX, networkRight - 28, 540, &fonts::Font4);
+  drawMonoIcon(networkX, 618, ICON_MQTT, 1);
   drawTextRowAligned("MQTT RETRY", String(g_luxStatus.mqtt_reconnect_count),
-                     UI_MARGIN_X + 18, M5.Display.width() - UI_MARGIN_X - 20, 702, &fonts::Font4);
+                     networkX, networkRight - 28, 594, &fonts::Font4);
+  M5.Display.drawLine(UI_MARGIN_X + 18, 664, M5.Display.width() - UI_MARGIN_X - 18, 664, TFT_BLACK);
+  drawMonoIcon(networkX, 680, ICON_CLOCK, 1);
   drawTextRowAligned("UPDATED", formatUnixTime(g_luxStatus.unix_time),
-                     UI_MARGIN_X + 18, M5.Display.width() - UI_MARGIN_X - 20, 788, &fonts::Font2);
+                     networkX, networkRight - 28, 686, &fonts::Font2);
 
   if (strcmp(g_luxStatus.status, "ok") != 0) {
     const int warnX = 20;
@@ -837,6 +982,7 @@ void drawSlideStatus() {
     const int warnH = 38;
     M5.Display.fillRect(warnX, warnY, warnW, warnH, TFT_BLACK);
     M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+    drawMonoIcon(warnX + 10, warnY + 10, ICON_WARNING, 1);
     M5.Display.drawCentreString("WARNING: SENSOR / MQTT ISSUE", M5.Display.width() / 2, warnY + 10, &fonts::Font2);
     M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
   }
