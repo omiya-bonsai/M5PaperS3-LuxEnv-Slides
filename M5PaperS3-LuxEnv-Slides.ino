@@ -31,7 +31,7 @@ static constexpr const char* MQTT_CLIENT_ID    = "m5papers3_lux_env_dashboard";
 // ---------------------- timing -------------------------------
 static constexpr uint32_t MQTT_RETRY_MS        = 5000;
 static constexpr uint32_t SLIDE_INTERVAL_MS    = 15000;
-static constexpr uint32_t EPD_REFRESH_MS       = 30000;
+static constexpr uint32_t EPD_REFRESH_MS       = SLIDE_INTERVAL_MS;
 static constexpr uint32_t WIFI_RETRY_MS        = 5000;
 static constexpr uint32_t NTP_RETRY_MS         = 60000;
 static constexpr uint32_t STATE_SAVE_MS        = 30000;
@@ -207,7 +207,8 @@ void saveLatestState() {
   ensureLogDirs();
 
   StaticJsonDocument<1024> doc;
-  doc["saved_at"] = getLocalTime(nullptr, 1) ? (uint32_t)time(nullptr) : 0;
+  struct tm tmLocal;
+  doc["saved_at"] = getLocalTime(&tmLocal, 1) ? (uint32_t)time(nullptr) : 0;
 
   JsonObject env4 = doc.createNestedObject("env4");
   env4["ts"] = g_env4.ts;
@@ -494,9 +495,13 @@ void handleLuxStatus(const JsonDocument& doc) {
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  Serial.printf("[MQTT] topic=%s len=%u\n", topic, length);
   StaticJsonDocument<512> doc;
   DeserializationError err = deserializeJson(doc, payload, length);
-  if (err) return;
+  if (err) {
+    Serial.printf("[MQTT] json error: %s\n", err.c_str());
+    return;
+  }
 
   if (strcmp(topic, TOPIC_ENV4) == 0) {
     handleEnv4(doc);
@@ -509,6 +514,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   }
 
   saveLatestState();
+  Serial.println("[MQTT] handled");
 }
 
 // ---------------------- drawing helpers ----------------------
@@ -536,7 +542,7 @@ void drawFooter() {
   M5.Display.drawRightString(net + "  " + mq, M5.Display.width() - 16, M5.Display.height() - 28, &fonts::Font2);
 }
 
-void drawKeyValue(const char* label, const String& value, int x, int y, const lgfx::IFont* valueFont = &fonts::Font6) {
+void drawKeyValue(const char* label, const String& value, int x, int y, const lgfx::IFont* valueFont = &fonts::Font4) {
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
   M5.Display.drawString(label, x, y, &fonts::Font2);
   M5.Display.drawString(value, x, y + 18, valueFont);
@@ -598,13 +604,13 @@ void drawSimpleLineGraphFloat(int x, int y, int w, int h, const float* vals, siz
 
 void drawSlideSummary() {
   drawHeader("SLIDE 1  CURRENT");
-  drawKeyValue("TEMP", formatFloat1(g_env4.temperature) + " C", 24, 68);
-  drawKeyValue("HUM", formatFloat1(g_env4.humidity) + " %", 24, 178);
+  drawKeyValue("TEMP", formatFloat1(g_env4.temperature) + " C", 24, 68, &fonts::Font6);
+  drawKeyValue("HUM", formatFloat1(g_env4.humidity) + " %", 24, 178, &fonts::Font6);
   drawKeyValue("PRES", formatFloat1(g_env4.pressure) + " hPa", 24, 288, &fonts::Font4);
-  drawKeyValue("LUX", formatFloat1(g_luxRaw.lux), 24, 400);
+  drawKeyValue("LUX", formatFloat1(g_luxRaw.lux), 24, 400, &fonts::Font6);
 
-  drawKeyValue("LUX AVG", formatFloat1(g_luxMeta.avg), 290, 68);
-  drawKeyValue("LUX DELTA", formatFloat1(g_luxMeta.delta), 290, 178);
+  drawKeyValue("LUX AVG", formatFloat1(g_luxMeta.avg), 290, 68, &fonts::Font6);
+  drawKeyValue("LUX DELTA", formatFloat1(g_luxMeta.delta), 290, 178, &fonts::Font6);
   drawKeyValue("LUX RATE", formatFloat2(g_luxMeta.rate_pct) + " %", 290, 288, &fonts::Font4);
 
   M5.Display.drawString("TREND", 290, 400, &fonts::Font2);
@@ -621,13 +627,13 @@ void drawSlideSignals() {
   String lArrow = arrowForDelta(g_luxMeta.delta);
 
   M5.Display.drawString("PRESSURE", 40, 90, &fonts::Font4);
-  M5.Display.drawString(pArrow, 360, 90, &fonts::Font6);
+  M5.Display.drawString(pArrow, 360, 90, &fonts::Font4);
 
   M5.Display.drawString("HUMIDITY", 40, 210, &fonts::Font4);
-  M5.Display.drawString(hArrow, 360, 210, &fonts::Font6);
+  M5.Display.drawString(hArrow, 360, 210, &fonts::Font4);
 
   M5.Display.drawString("LIGHT", 40, 330, &fonts::Font4);
-  M5.Display.drawString(lArrow, 360, 330, &fonts::Font6);
+  M5.Display.drawString(lArrow, 360, 330, &fonts::Font4);
 
   M5.Display.drawString("QUESTION", 40, 470, &fonts::Font4);
   M5.Display.drawString("RAIN COMING?", 220, 470, &fonts::Font4);
@@ -673,9 +679,13 @@ void drawSlideStatus() {
   drawKeyValue("MQTT RETRY", String(g_luxStatus.mqtt_reconnect_count), 290, 400);
 
   if (strcmp(g_luxStatus.status, "ok") != 0) {
-    M5.Display.fillRect(20, 520, 500, 70, TFT_BLACK);
+    const int warnX = 20;
+    const int warnY = M5.Display.height() - 110;
+    const int warnW = M5.Display.width() - 40;
+    const int warnH = 42;
+    M5.Display.fillRect(warnX, warnY, warnW, warnH, TFT_BLACK);
     M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
-    M5.Display.drawCentreString("WARNING: SENSOR / MQTT ISSUE", M5.Display.width() / 2, 544, &fonts::Font2);
+    M5.Display.drawCentreString("WARNING: SENSOR / MQTT ISSUE", M5.Display.width() / 2, warnY + 12, &fonts::Font2);
     M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
   }
 
@@ -694,38 +704,51 @@ void renderSlide() {
 
 // ---------------------- setup / loop -------------------------
 void setup() {
+  Serial.begin(115200);
+  delay(500);
+  Serial.println("[SETUP] begin");
+
   auto cfg = M5.config();
   cfg.external_spk = false;
+  Serial.println("[SETUP] calling M5.begin()");
   M5.begin(cfg);
+  Serial.println("[SETUP] M5.begin() done");
 
   // Landscape gives a wider graph area on PaperS3.
   M5.Display.setRotation(1);
-  M5.Display.setEpdMode(epd_mode_t::epd_quality);
+  M5.update();
+  Serial.println("[SETUP] display rotation done");
 
-  Serial.begin(115200);
-  delay(300);
+  M5.Display.setEpdMode(epd_mode_t::epd_quality);
+  Serial.println("[SETUP] EPD mode set");
 
   M5.Display.fillScreen(TFT_WHITE);
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
   M5.Display.drawString("BOOTING...", 30, 30, &fonts::Font4);
+  Serial.println("[SETUP] boot screen drawn");
 
-  g_sdReady = SD.begin(GPIO_NUM_47, SPI, 25000000);
+  g_sdReady = SD.begin();
+  Serial.printf("[SETUP] SD.begin() -> %s\n", g_sdReady ? "ok" : "ng");
   if (g_sdReady) {
     ensureLogDirs();
     loadLatestState();
+    Serial.println("[SETUP] state restored");
   }
 
   WiFi.mode(WIFI_STA);
   mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
   mqttClient.setCallback(mqttCallback);
+  Serial.println("[SETUP] network configured");
 
   connectWiFiIfNeeded();
   syncNtpIfNeeded();
+  Serial.println("[SETUP] initial connect attempts done");
 
   g_needRedraw = true;
   g_lastSlideMs = millis();
-  g_lastRefreshMs = 0;
+  g_lastRefreshMs = millis() - EPD_REFRESH_MS;
   g_lastStateSaveMs = millis();
+  Serial.println("[SETUP] ready");
 }
 
 void handleButtons() {
@@ -744,6 +767,7 @@ void handleButtons() {
 
 void loop() {
   M5.update();
+  bool manualRefresh = M5.BtnB.wasClicked();
 
   handleButtons();
   connectWiFiIfNeeded();
@@ -762,12 +786,15 @@ void loop() {
   }
 
   if (g_sdReady && nowMs - g_lastStateSaveMs >= STATE_SAVE_MS) {
+    Serial.println("[LOOP] periodic state save");
     saveLatestState();
     g_lastStateSaveMs = nowMs;
   }
 
-  if (g_needRedraw && (nowMs - g_lastRefreshMs >= EPD_REFRESH_MS || M5.BtnB.wasClicked())) {
+  if (g_needRedraw && (nowMs - g_lastRefreshMs >= EPD_REFRESH_MS || manualRefresh)) {
+    Serial.printf("[LOOP] render slide=%u now=%lu last=%lu\n", g_currentSlide, (unsigned long)nowMs, (unsigned long)g_lastRefreshMs);
     renderSlide();
+    Serial.println("[LOOP] render done");
     g_lastRefreshMs = nowMs;
     g_needRedraw = false;
   }
