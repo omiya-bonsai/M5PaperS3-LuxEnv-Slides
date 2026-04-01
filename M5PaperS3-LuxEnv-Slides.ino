@@ -682,6 +682,11 @@ static constexpr int UI_FOOTER_H = 34;
 static constexpr int UI_CONTENT_TOP = 78;
 static constexpr int FOOTER_BUTTON_W = 96;
 static constexpr int FOOTER_BUTTON_H = 22;
+static constexpr int FOOTER_BUTTON_HIT_W = 164;
+static constexpr int FOOTER_BUTTON_HIT_H = 38;
+static constexpr int STATUS_SWIPE_START_Y = 760;
+static constexpr int STATUS_SWIPE_MIN_DISTANCE = 120;
+static constexpr int STATUS_SWIPE_MAX_SIDE_SHIFT = 80;
 
 void drawHeader(const char* title) {
   M5.Display.fillScreen(TFT_WHITE);
@@ -714,10 +719,19 @@ void drawFooter() {
 }
 
 bool footerButtonContains(int x, int y) {
-  const int btnX = (M5.Display.width() - FOOTER_BUTTON_W) / 2;
-  const int btnY = M5.Display.height() - UI_FOOTER_H + 6;
-  return x >= btnX && x < (btnX + FOOTER_BUTTON_W)
-      && y >= btnY && y < (btnY + FOOTER_BUTTON_H);
+  const int hitX = (M5.Display.width() - FOOTER_BUTTON_HIT_W) / 2;
+  const int hitY = M5.Display.height() - UI_FOOTER_H;
+  return x >= hitX && x < (hitX + FOOTER_BUTTON_HIT_W)
+      && y >= hitY && y < (hitY + FOOTER_BUTTON_HIT_H);
+}
+
+bool isStatusSwipe(const m5::touch_detail_t& touch) {
+  if (g_currentSlide == STATUS_SCREEN_INDEX) return false;
+  if (!(touch.wasFlicked() || touch.wasDragged() || touch.wasReleased())) return false;
+  if (touch.base_y < STATUS_SWIPE_START_Y) return false;
+  if (touch.distanceY() > -STATUS_SWIPE_MIN_DISTANCE) return false;
+  if (abs(touch.distanceX()) > STATUS_SWIPE_MAX_SIDE_SHIFT) return false;
+  return true;
 }
 
 void drawKeyValue(const char* label, const String& value, int x, int y, const lgfx::IFont* valueFont = &fonts::Font4) {
@@ -998,7 +1012,7 @@ void drawPatternSummaryRow(int x, int y, const char* heading,
                            const String& pSignal, const String& hSignal, const String& lSignal,
                            bool lightActive, bool isClueRow) {
   M5.Display.drawString(heading, x, y, &fonts::Font2);
-  int baseX = x + 48;
+  int baseX = x + 86;
   String cluePressure = isClueRow ? String("DOWN") : pSignal;
   String clueHumidity = isClueRow ? String("UP") : hSignal;
   String clueLight = isClueRow ? String("DOWN") : lSignal;
@@ -1206,19 +1220,16 @@ void drawSlideSummary() {
   drawMetricWithIcon(ICON_PRESSURE, "PRES", formatFloat1(g_env4.pressure), "hPa", rightColX, 248, rightUnitX);
 
   drawCard(UI_MARGIN_X, changeY, cardW, changeH, "RECENT CHANGES");
-  drawChangeSummaryRow(ICON_PRESSURE, "PRESSURE", pArrow, 490);
-  drawChangeSummaryRow(ICON_HUMIDITY, "HUMIDITY", hArrow, 548);
-  drawChangeSummaryRow(ICON_LIGHT, "LIGHT", lightDisplay, 606);
-  M5.Display.drawLine(innerX, 668, UI_MARGIN_X + cardW - 20, 668, TFT_BLACK);
-  M5.Display.drawString("LUX RATE (vs avg, last 6 min)", innerX, 686, &fonts::Font2);
-  M5.Display.drawRightString(formatFloat2(g_luxMeta.rate_pct) + " %", UI_MARGIN_X + cardW - 20, 684, &fonts::Font4);
-  M5.Display.drawLine(innerX, 724, UI_MARGIN_X + cardW - 20, 724, TFT_BLACK);
-  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), innerX, 744, &fonts::Font4);
-  drawPatternSummaryRow(innerX, 772, "Now:", pArrow, hArrow, lArrow, lightActive, false);
-  drawPatternSummaryRow(innerX, 800, "Look for:", pArrow, hArrow, lArrow, lightActive, true);
+  drawChangeSummaryRow(ICON_PRESSURE, "PRESSURE", pArrow, 506);
+  drawChangeSummaryRow(ICON_HUMIDITY, "HUMIDITY", hArrow, 564);
+  drawChangeSummaryRow(ICON_LIGHT, "LIGHT", lightDisplay, 622);
+  M5.Display.drawLine(innerX, 694, UI_MARGIN_X + cardW - 20, 694, TFT_BLACK);
+  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), innerX, 718, &fonts::Font4);
+  drawPatternSummaryRow(innerX, 754, "Now:", pArrow, hArrow, lArrow, lightActive, false);
+  drawPatternSummaryRow(innerX, 786, "Rain pattern:", pArrow, hArrow, lArrow, lightActive, true);
   M5.Display.drawString(lightActive ? "Pressure down  Humidity up  Light down in daytime"
                                    : "At night, use pressure and humidity.",
-                        innerX + 76, 826, &fonts::Font2);
+                        innerX + 76, 818, &fonts::Font2);
 
   drawFooter();
 }
@@ -1244,7 +1255,7 @@ void drawSlideSignals() {
   M5.Display.drawString("Check order: Pressure -> Humidity -> Light", UI_MARGIN_X + 18, 640, &fonts::Font2);
   M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), UI_MARGIN_X + 18, 666, &fonts::Font4);
   drawPatternSummaryRow(UI_MARGIN_X + 18, 696, "Now:", pArrow, hArrow, lArrow, lightActive, false);
-  drawPatternSummaryRow(UI_MARGIN_X + 18, 724, "Look for:", pArrow, hArrow, lArrow, lightActive, true);
+  drawPatternSummaryRow(UI_MARGIN_X + 18, 724, "Rain pattern:", pArrow, hArrow, lArrow, lightActive, true);
   M5.Display.drawString(lightActive ? "Pressure down  Humidity up  Light down in daytime"
                                    : "At night, use pressure and humidity.",
                         UI_MARGIN_X + 76, 752, &fonts::Font2);
@@ -1301,11 +1312,11 @@ void drawTrendGraphsSlide(const char* title, uint32_t targetWindowMin, const cha
 }
 
 void drawSlideGraphsShort() {
-  drawTrendGraphsSlide("SLIDE 3  SHORT-TERM", SHORT_WINDOW_MIN, "What is changing now?");
+  drawTrendGraphsSlide("SLIDE 3  SHORT-TERM (15 min)", SHORT_WINDOW_MIN, "What is changing now?");
 }
 
 void drawSlideGraphsLong() {
-  drawTrendGraphsSlide("SLIDE 4  LONG-TERM", LONG_WINDOW_MIN, "Is the trend continuing?");
+  drawTrendGraphsSlide("SLIDE 4  LONG-TERM (120 min)", LONG_WINDOW_MIN, "Is the trend continuing?");
 }
 
 void drawSlideStatus() {
@@ -1451,6 +1462,11 @@ void handleButtons() {
         g_lastMainSlide = g_currentSlide;
         g_currentSlide = STATUS_SCREEN_INDEX;
       }
+      g_lastSlideMs = millis();
+      g_needRedraw = true;
+    } else if (isStatusSwipe(touch)) {
+      g_lastMainSlide = g_currentSlide;
+      g_currentSlide = STATUS_SCREEN_INDEX;
       g_lastSlideMs = millis();
       g_needRedraw = true;
     }
