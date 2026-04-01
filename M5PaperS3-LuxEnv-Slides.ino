@@ -523,6 +523,8 @@ static constexpr int UI_MARGIN_X = 24;
 static constexpr int UI_HEADER_H = 52;
 static constexpr int UI_FOOTER_H = 34;
 static constexpr int UI_CONTENT_TOP = 78;
+static constexpr int FOOTER_BUTTON_W = 96;
+static constexpr int FOOTER_BUTTON_H = 22;
 
 void drawHeader(const char* title) {
   M5.Display.fillScreen(TFT_WHITE);
@@ -542,10 +544,22 @@ void drawFooter() {
   String ts = formatUnixTime((uint32_t)safeLatestTs());
   String net = (WiFi.status() == WL_CONNECTED) ? "WIFI OK" : "WIFI NG";
   String mq = mqttClient.connected() ? "MQTT OK" : "MQTT NG";
+  const int btnX = (M5.Display.width() - FOOTER_BUTTON_W) / 2;
+  const int btnY = M5.Display.height() - UI_FOOTER_H + 6;
+  const char* btnLabel = (g_currentSlide == 3) ? "BACK" : "STATUS";
 
   M5.Display.drawLine(0, M5.Display.height() - UI_FOOTER_H, M5.Display.width(), M5.Display.height() - UI_FOOTER_H, TFT_BLACK);
   M5.Display.drawString(ts, UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
+  M5.Display.drawRect(btnX, btnY, FOOTER_BUTTON_W, FOOTER_BUTTON_H, TFT_BLACK);
+  M5.Display.drawCentreString(btnLabel, btnX + FOOTER_BUTTON_W / 2, btnY + 4, &fonts::Font2);
   M5.Display.drawRightString(net + "  " + mq, M5.Display.width() - UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
+}
+
+bool footerButtonContains(int x, int y) {
+  const int btnX = (M5.Display.width() - FOOTER_BUTTON_W) / 2;
+  const int btnY = M5.Display.height() - UI_FOOTER_H + 6;
+  return x >= btnX && x < (btnX + FOOTER_BUTTON_W)
+      && y >= btnY && y < (btnY + FOOTER_BUTTON_H);
 }
 
 void drawKeyValue(const char* label, const String& value, int x, int y, const lgfx::IFont* valueFont = &fonts::Font4) {
@@ -887,7 +901,7 @@ void drawSlideSignals() {
   drawCard(UI_MARGIN_X, 676, M5.Display.width() - UI_MARGIN_X * 2, 132, "INTERPRET");
   M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / 3", UI_MARGIN_X + 18, 716, &fonts::Font4);
   M5.Display.drawString("Pressure down + humidity up + light down are clues.", UI_MARGIN_X + 18, 744, &fonts::Font2);
-  M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X - 18, 784, &fonts::Font4);
+  M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X - 28, 776, &fonts::Font4);
 
   drawFooter();
 }
@@ -1051,15 +1065,32 @@ void setup() {
 
 void handleButtons() {
   if (M5.BtnA.wasClicked()) {
-    g_currentSlide = (g_currentSlide + 3) % 4;
+    if (g_currentSlide == 3) {
+      g_currentSlide = 2;
+    } else {
+      g_currentSlide = (g_currentSlide + 2) % 3;
+    }
     g_needRedraw = true;
   }
   if (M5.BtnC.wasClicked()) {
-    g_currentSlide = (g_currentSlide + 1) % 4;
+    if (g_currentSlide == 3) {
+      g_currentSlide = 0;
+    } else {
+      g_currentSlide = (g_currentSlide + 1) % 3;
+    }
     g_needRedraw = true;
   }
   if (M5.BtnB.wasClicked()) {
     g_needRedraw = true;  // manual refresh
+  }
+
+  if (M5.Touch.getCount()) {
+    const auto& touch = M5.Touch.getDetail();
+    if (touch.wasClicked() && footerButtonContains(touch.x, touch.y)) {
+      g_currentSlide = (g_currentSlide == 3) ? 0 : 3;
+      g_lastSlideMs = millis();
+      g_needRedraw = true;
+    }
   }
 }
 
@@ -1078,7 +1109,9 @@ void loop() {
 
   uint32_t nowMs = millis();
   if (nowMs - g_lastSlideMs >= SLIDE_INTERVAL_MS) {
-    g_currentSlide = (g_currentSlide + 1) % 4;
+    if (g_currentSlide != 3) {
+      g_currentSlide = (g_currentSlide + 1) % 3;
+    }
     g_lastSlideMs = nowMs;
     g_needRedraw = true;
   }
