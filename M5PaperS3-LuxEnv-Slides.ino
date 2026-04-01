@@ -250,9 +250,9 @@ String formatFooterTime() {
 String formatBatteryStatus() {
   int batt = M5.Power.getBatteryLevel();
   if (batt < 0 || batt > 100) {
-    return "--%";
+    return "BAT --%";
   }
-  String label = String(batt) + "%";
+  String label = String("BAT ") + String(batt) + "%";
   if (M5.Power.isCharging()) {
     label += "+";
   }
