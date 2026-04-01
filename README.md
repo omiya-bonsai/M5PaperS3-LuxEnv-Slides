@@ -2,7 +2,7 @@
 
 ## Overview
 
-This sketch runs on **M5PaperS3** and renders a portrait 4-slide teaching dashboard.
+This sketch runs on **M5PaperS3** and renders a portrait teaching dashboard for reading environmental change.
 
 It is designed for a learning use case:
 
@@ -31,7 +31,7 @@ Meaning:
 
 ## Storage
 
-The microSD card is used for lightweight persistence and logging.
+The microSD card is used for persistence and graph continuity.
 
 - `/logs/env4_log.csv`
 - `/logs/lux_log.csv`
@@ -42,11 +42,13 @@ Current behavior:
 - append CSV logs while running
 - cache latest received values
 - restore latest cached state on boot
+- restore recent graph history from CSV on boot
+- discard restored graph history if it is too old compared with the first live MQTT time
 
-Not implemented:
+SD access is initialized with explicit SPI settings:
 
-- full history replay from CSV
-- full graph reconstruction from SD on startup
+- PaperS3 SD CS: `GPIO_NUM_47`
+- SPI clock: `40 MHz`
 
 ## Slides
 
@@ -67,8 +69,10 @@ The lower block summarizes recent changes across:
 
 It also shows:
 
-- lux rate versus recent average
 - number of rain-related signs currently observed
+- a simple `Now` pattern line
+- a simple `Rain pattern` reference line
+- a short explanation line for daytime or night mode
 
 ### Slide 2: Signals
 
@@ -84,13 +88,19 @@ Each row combines:
 - state word
 - small icon / arrow cue
 - centered gauge
-- short interpretation
+- short meaning hint
 
-The bottom band summarizes the current rain-sign count.
+The bottom interpretation band shows:
 
-### Slide 3: Graphs
+- rain-sign count
+- current pattern summary
+- rain-pattern reference
+- a short daytime / night explanation
+- a guiding question
 
-Shows simple rolling graphs for:
+### Slide 3: Short-Term
+
+Shows short-term rolling graphs for:
 
 - pressure
 - humidity
@@ -99,16 +109,40 @@ Shows simple rolling graphs for:
 It also shows:
 
 - graph window start / end time
+- graph midpoint time
 - current values summary strip
+- question: `What is changing now?`
 
-### Slide 4: Status
+Default target window:
 
-Shows two diagnostic cards:
+- `15 min`
+
+### Slide 4: Long-Term
+
+Shows long-term rolling graphs for:
+
+- pressure
+- humidity
+- lux
+
+It also shows:
+
+- graph window start / middle / end time
+- current values summary strip
+- question: `Is the trend continuing?`
+
+Default target window:
+
+- `120 min`
+
+### Status Screen
+
+Status is a separate auxiliary screen, not part of the normal 4-slide loop.
+
+It shows two diagnostic cards:
 
 - `HEALTH`
 - `NETWORK`
-
-It is intended to stay quiet during normal operation and become obvious only when something is wrong.
 
 ## UI Notes
 
@@ -120,14 +154,44 @@ It is intended to stay quiet during normal operation and become obvious only whe
   - `fonts::Font6`
 - A small built-in monochrome icon set is provided in [icons.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/icons.h)
 - No SD-backed emoji or external icon font is required
+- Header right side shows battery level as `BAT xx%`
+- Footer left side shows JST time converted from received MQTT unix time
+- If no valid live time has been received yet, the footer shows `--:--`
 
-## Buttons
+## Navigation
 
 - `BtnA`: previous slide
 - `BtnB`: force redraw
 - `BtnC`: next slide
 
-Slides also auto-rotate.
+Slides auto-rotate across the 4 teaching slides.
+
+The footer center button opens:
+
+- `STATUS` from the teaching slides
+- `BACK` from the status screen
+
+There is also a swipe-up gesture from the footer area to open the status screen.
+
+## Night Mode
+
+`Light` is not always used as a rain clue.
+
+During night mode:
+
+- rain signs use `pressure + humidity`
+- the denominator changes from `/3` to `/2`
+- `Light` is shown as skipped for interpretation
+
+Night mode is enabled only when both are true:
+
+- local time is after sunset or before sunrise
+- low lux continues for a sustained period
+
+Sunrise / sunset are estimated locally from the configured site position:
+
+- `CONFIG_SITE_LATITUDE`
+- `CONFIG_SITE_LONGITUDE`
 
 ## Required Files
 
@@ -149,10 +213,12 @@ You can copy [config.example.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv
 - Board: `M5PaperS3`
 - `#include <SD.h>` must stay before `#include <M5Unified.h>`
 - The sketch is built around recent `M5Unified` / `M5GFX` versions and avoids unsupported fonts such as `Font5`
+- Build target used in this project:
+  - `m5stack:esp32:m5stack_papers3`
 
 ## Current Focus
 
-The sensor sender side is already stable enough. The main focus is display quality:
+The sender side is already stable enough. The main focus is display quality:
 
 - readability
 - visual hierarchy
