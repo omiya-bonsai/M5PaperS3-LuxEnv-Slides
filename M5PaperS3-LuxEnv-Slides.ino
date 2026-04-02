@@ -1162,11 +1162,13 @@ void drawPatternSummaryRow(int x, int y, const char* heading,
 }
 
 void drawChangeSummaryRow(const MonoIcon& icon, const char* label, const String& signal, int y) {
+  const MonoIcon& stateIcon = signalIcon(signal);
+  const int stateIconX = UI_MARGIN_X + 360;
   drawMonoIcon(UI_MARGIN_X + 22, y + 2, icon, 1);
   drawUiTextLeft(label, UI_MARGIN_X + 22 + icon.width + 10, y + 8, uiSmallFont());
   drawUiTextLeft(signalGlyph(signal), UI_MARGIN_X + 220, y, uiBodyFont());
-  drawMonoIcon(UI_MARGIN_X + 360, y - 6, signalIcon(signal), 1);
-  drawUiTextRight(signalMeaning(label, signal), M5.Display.width() - UI_MARGIN_X - 20, y + 8, uiSmallFont());
+  drawMonoIcon(stateIconX, y - 6, stateIcon, 1);
+  drawUiTextRight(signalMeaning(label, signal), stateIconX - 14, y + 8, uiSmallFont());
 }
 
 float clamp01(float v) {
@@ -1353,7 +1355,7 @@ void drawSlideSummaryBody() {
 
   drawCard(UI_MARGIN_X, currentY, cardW, currentH, ui_text::kCurrentValues);
   drawMetricWithIcon(ICON_TEMP, ui_text::kTemp, formatFloat1(g_env4.temperature), "C", innerX, 126, leftUnitX);
-  drawMetricWithIcon(ICON_LIGHT, ui_text::kLux, luxValue, "", rightColX, 126, 0);
+  drawMetricWithIcon(ICON_LIGHT, ui_text::kLux, luxValue, "lux", rightColX, 126, rightColX + 118);
   drawMetricWithIcon(ICON_HUMIDITY, ui_text::kHum, formatFloat1(g_env4.humidity), "%", innerX, 248, leftUnitX);
   drawMetricWithIcon(ICON_PRESSURE, ui_text::kPres, formatFloat1(g_env4.pressure), "hPa", rightColX, 248, rightUnitX);
 
