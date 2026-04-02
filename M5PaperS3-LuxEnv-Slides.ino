@@ -169,6 +169,7 @@ uint32_t g_lastNtpAttemptMs = 0;
 uint32_t g_lastStateSaveMs = 0;
 
 bool g_needRedraw = true;
+bool g_renderInProgress = false;
 bool g_sdReady = false;
 bool g_timeValid = false;
 
@@ -863,33 +864,54 @@ void drawSummaryRow(const char* label, const String& value, int x, int y) {
 void drawMonoIcon(int x, int y, const MonoIcon& icon, int scale = 1) {
   const int bytesPerRow = (icon.width + 7) / 8;
   for (int row = 0; row < icon.height; ++row) {
-    for (int col = 0; col < icon.width; ++col) {
-      uint8_t bits = pgm_read_byte(icon.data + row * bytesPerRow + (col / 8));
-      if (bits & (0x80 >> (col % 8))) {
-        M5.Display.fillRect(x + col * scale, y + row * scale, scale, scale, TFT_BLACK);
+    int runStart = -1;
+    for (int col = 0; col <= icon.width; ++col) {
+      bool pixelOn = false;
+      if (col < icon.width) {
+        uint8_t bits = pgm_read_byte(icon.data + row * bytesPerRow + (col / 8));
+        pixelOn = (bits & (0x80 >> (col % 8))) != 0;
+      }
+
+      if (pixelOn) {
+        if (runStart < 0) runStart = col;
+      } else if (runStart >= 0) {
+        M5.Display.fillRect(x + runStart * scale,
+                            y + row * scale,
+                            (col - runStart) * scale,
+                            scale,
+                            TFT_BLACK);
+        runStart = -1;
       }
     }
   }
 }
 
+int scaledIconWidth(const MonoIcon& icon, int scale = 1) {
+  return icon.width * scale;
+}
+
+int scaledIconHeight(const MonoIcon& icon, int scale = 1) {
+  return icon.height * scale;
+}
+
 void drawLabeledIcon(const MonoIcon& icon, const char* label, int x, int y, int scale = 1) {
   drawMonoIcon(x, y, icon, scale);
-  drawUiTextLeft(label, x + icon.width * scale + 8, y + 2, uiSmallFont());
+  drawUiTextLeft(label, x + scaledIconWidth(icon, scale) + 10, y + 8, uiSmallFont());
 }
 
 void drawMetricWithIcon(const MonoIcon& icon, const char* label, const String& value, const String& unit,
                         int x, int y, int unitX) {
   drawMonoIcon(x, y + 2, icon, 1);
-  drawUiTextLeft(label, x + 24, y + 2, uiSmallFont());
-  M5.Display.drawString(value, x, y + 28, &fonts::Font6);
+  drawUiTextLeft(label, x + icon.width + 10, y + 8, uiSmallFont());
+  M5.Display.drawString(value, x, y + icon.height + 14, &fonts::Font6);
   if (unit.length() > 0) {
-    M5.Display.drawString(unit, unitX, y + 50, &fonts::Font2);
+    M5.Display.drawString(unit, unitX, y + icon.height + 36, &fonts::Font2);
   }
 }
 
 void drawSummaryIconRow(const MonoIcon& icon, const char* label, const String& value, int x, int y) {
   drawMonoIcon(x, y - 2, icon, 1);
-  drawUiTextLeft(label, x + 24, y, uiSmallFont());
+  drawUiTextLeft(label, x + icon.width + 10, y + 6, uiSmallFont());
   drawUiTextRight(value, M5.Display.width() - UI_MARGIN_X - 8, y, uiBodyFont());
 }
 
@@ -1091,7 +1113,7 @@ void drawSignalToken(int x, int y, const char* label, const String& signal) {
     drawUiTextLeft(ui_text::kNight, iconX, y, uiSmallFont());
     return;
   }
-  drawMonoIcon(iconX, y - 2, signalIcon(signal), 1);
+  drawMonoIcon(iconX, y - 10, signalIcon(signal), 1);
 }
 
 void drawPatternSummaryRow(int x, int y, const char* heading,
@@ -1111,10 +1133,10 @@ void drawPatternSummaryRow(int x, int y, const char* heading,
 
 void drawChangeSummaryRow(const MonoIcon& icon, const char* label, const String& signal, int y) {
   drawMonoIcon(UI_MARGIN_X + 22, y + 2, icon, 1);
-  drawUiTextLeft(label, UI_MARGIN_X + 46, y, uiSmallFont());
+  drawUiTextLeft(label, UI_MARGIN_X + 22 + icon.width + 10, y + 8, uiSmallFont());
   drawUiTextLeft(signalGlyph(signal), UI_MARGIN_X + 220, y, uiBodyFont());
-  drawMonoIcon(UI_MARGIN_X + 370, y - 2, signalIcon(signal), 1);
-  drawUiTextRight(signalMeaning(label, signal), M5.Display.width() - UI_MARGIN_X - 20, y, uiSmallFont());
+  drawMonoIcon(UI_MARGIN_X + 360, y - 6, signalIcon(signal), 1);
+  drawUiTextRight(signalMeaning(label, signal), M5.Display.width() - UI_MARGIN_X - 20, y + 8, uiSmallFont());
 }
 
 float clamp01(float v) {
@@ -1189,10 +1211,10 @@ void drawSignalRow(const MonoIcon& icon, const char* label, const String& signal
   const int gaugeX = UI_MARGIN_X + 10;
   const int gaugeW = M5.Display.width() - UI_MARGIN_X * 2 - 20;
   drawLabeledIcon(icon, label, labelX, y + 4);
-  drawUiTextLeft(signalGlyph(signal), stateX, y + 38, uiBodyFont());
-  drawMonoIcon(M5.Display.width() - UI_MARGIN_X - 30, y + 34, signalIcon(signal), 1);
-  drawUiTextRight(signalMeaning(label, signal), M5.Display.width() - UI_MARGIN_X - 48, y + 40, uiSmallFont());
-  drawCenteredGauge(gaugeX, y + 98, gaugeW, 22, gaugeValue);
+  drawUiTextLeft(signalGlyph(signal), stateX, y + 54, uiBodyFont());
+  drawMonoIcon(M5.Display.width() - UI_MARGIN_X - signalIcon(signal).width - 10, y + 42, signalIcon(signal), 1);
+  drawUiTextRight(signalMeaning(label, signal), M5.Display.width() - UI_MARGIN_X - signalIcon(signal).width - 24, y + 54, uiSmallFont());
+  drawCenteredGauge(gaugeX, y + 108, gaugeW, 22, gaugeValue);
   M5.Display.drawLine(UI_MARGIN_X, y + 148, M5.Display.width() - UI_MARGIN_X, y + 148, TFT_BLACK);
 }
 
@@ -1208,7 +1230,7 @@ void drawSimpleLineGraphFloat(int x, int y, int w, int h, const MonoIcon& icon,
                               size_t maxRenderPoints, bool drawAllMarkers) {
   M5.Display.drawRect(x, y, w, h, TFT_BLACK);
   drawMonoIcon(x + 6, y + 4, icon, 1);
-  drawUiTextLeft(title, x + 30, y + 4, uiSmallFont());
+  drawUiTextLeft(title, x + icon.width + 14, y + 10, uiSmallFont());
 
   if (n < 2) {
     drawUiTextCenter(ui_text::kNoData, x + w / 2, y + h / 2 - 8, uiSmallFont());
@@ -1421,7 +1443,7 @@ void drawSlideStatus() {
   const int networkRight = M5.Display.width() - UI_MARGIN_X - 22;
 
   drawCard(UI_MARGIN_X, 92, cardW, 252, ui_text::kHealth);
-  drawMonoIcon(M5.Display.width() - UI_MARGIN_X - 38, 102, ICON_SENSOR, 1);
+  drawMonoIcon(M5.Display.width() - UI_MARGIN_X - ICON_SENSOR.width - 6, 102, ICON_SENSOR, 1);
   drawTextRowAligned(ui_text::kSensor, String(g_luxStatus.sensor_ready ? "READY" : "FAIL"),
                      healthX, healthRight - 28, 170, &fonts::Font4);
   drawTextRowAligned(ui_text::kStatus, String(g_luxStatus.status),
@@ -1430,30 +1452,30 @@ void drawSlideStatus() {
                      healthX, healthRight - 28, 278, &fonts::Font4);
 
   drawCard(UI_MARGIN_X, 370, cardW, 396, ui_text::kNetwork);
-  drawMonoIcon(M5.Display.width() - UI_MARGIN_X - 38, 380, ICON_WIFI, 1);
+  drawMonoIcon(M5.Display.width() - UI_MARGIN_X - ICON_WIFI.width - 6, 380, ICON_WIFI, 1);
   drawTextRowAligned(ui_text::kWifi, String(g_luxStatus.wifi),
                      networkX, networkRight - 28, 444, &fonts::Font4);
   drawTextRowAligned(ui_text::kIp, String(g_luxStatus.ip),
                      networkX, networkRight - 28, 496, &fonts::Font4);
   drawTextRowAligned(ui_text::kErrCnt, String(g_luxStatus.sensor_error_count),
                      networkX, networkRight - 28, 548, &fonts::Font4);
-  drawMonoIcon(networkX, 618, ICON_MQTT, 1);
+  drawMonoIcon(networkX, 612, ICON_MQTT, 1);
   drawTextRowAligned(ui_text::kMqttRetry, String(g_luxStatus.mqtt_reconnect_count),
                      networkX, networkRight - 28, 600, &fonts::Font4);
   M5.Display.drawLine(UI_MARGIN_X + 18, 670, M5.Display.width() - UI_MARGIN_X - 18, 670, TFT_BLACK);
-  drawMonoIcon(networkX, 680, ICON_CLOCK, 1);
+  drawMonoIcon(networkX, 674, ICON_CLOCK, 1);
   drawTextRowAligned(ui_text::kUpdated, formatUnixTime(g_luxStatus.unix_time),
                      networkX, networkRight - 28, 698, isJapaneseUi() ? uiSmallFont() : &fonts::Font2);
 
   if (strcmp(g_luxStatus.status, "ok") != 0) {
     const int warnX = 20;
-    const int warnY = M5.Display.height() - 108;
+    const int warnY = M5.Display.height() - 122;
     const int warnW = M5.Display.width() - 40;
-    const int warnH = 38;
+    const int warnH = 52;
     M5.Display.fillRect(warnX, warnY, warnW, warnH, TFT_BLACK);
     M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
     drawMonoIcon(warnX + 10, warnY + 10, ICON_WARNING, 1);
-    drawUiTextCenter(ui_text::kWarningSensorMqtt, M5.Display.width() / 2, warnY + 10, uiSmallFont(), TFT_WHITE, TFT_BLACK);
+    drawUiTextCenter(ui_text::kWarningSensorMqtt, M5.Display.width() / 2, warnY + 16, uiSmallFont(), TFT_WHITE, TFT_BLACK);
     M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
   }
 
@@ -1580,13 +1602,13 @@ void loop() {
   }
 
   uint32_t nowMs = millis();
-  if (nowMs - g_lastSlideMs >= SLIDE_INTERVAL_MS) {
+  if (!g_renderInProgress && nowMs - g_lastSlideMs >= SLIDE_INTERVAL_MS) {
     if (g_currentSlide != STATUS_SCREEN_INDEX) {
       g_currentSlide = (g_currentSlide + 1) % MAIN_SLIDE_COUNT;
       g_lastMainSlide = g_currentSlide;
+      g_lastSlideMs = nowMs;
+      g_needRedraw = true;
     }
-    g_lastSlideMs = nowMs;
-    g_needRedraw = true;
   }
 
   if (g_sdReady && nowMs - g_lastStateSaveMs >= STATE_SAVE_MS) {
@@ -1597,10 +1619,13 @@ void loop() {
 
   if (g_needRedraw && (nowMs - g_lastRefreshMs >= EPD_REFRESH_MS || manualRefresh)) {
     Serial.printf("[LOOP] render slide=%u now=%lu last=%lu\n", g_currentSlide, (unsigned long)nowMs, (unsigned long)g_lastRefreshMs);
+    g_renderInProgress = true;
     renderSlide();
     Serial.println("[LOOP] render done");
-    g_lastRefreshMs = nowMs;
+    uint32_t doneMs = millis();
+    g_lastRefreshMs = doneMs;
     g_needRedraw = false;
+    g_renderInProgress = false;
   }
 
   delay(20);
