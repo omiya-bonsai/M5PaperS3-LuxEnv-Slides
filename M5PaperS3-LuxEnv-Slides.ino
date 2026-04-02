@@ -172,6 +172,7 @@ bool g_needRedraw = true;
 bool g_renderInProgress = false;
 bool g_sdReady = false;
 bool g_timeValid = false;
+uint8_t g_lastRenderedSlide = 255;
 
 // ---------------------- utilities ----------------------------
 String formatUnixTime(uint32_t ts) {
@@ -772,7 +773,7 @@ void drawUiTextCenter(const String& text, int centerX, int y, const lgfx::IFont*
   drawUiTextCenter(text.c_str(), centerX, y, font, fg, bg);
 }
 
-void drawHeader(const char* title) {
+void drawHeaderFrame(const char* title) {
   M5.Display.fillScreen(TFT_WHITE);
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
   M5.Display.setTextDatum(top_left);
@@ -780,13 +781,24 @@ void drawHeader(const char* title) {
 
   M5.Display.fillRect(0, 0, M5.Display.width(), UI_HEADER_H - 8, TFT_BLACK);
   drawUiTextLeft(title, 16, 14, uiTitleFont(), TFT_WHITE, TFT_BLACK);
-  drawUiTextRight(formatBatteryStatus(), M5.Display.width() - 16, 16, uiSmallFont(), TFT_WHITE, TFT_BLACK);
 
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
   M5.Display.drawLine(0, UI_HEADER_H, M5.Display.width(), UI_HEADER_H, TFT_BLACK);
 }
 
-void drawFooter() {
+void drawHeaderDynamic() {
+  M5.Display.fillRect(M5.Display.width() - 150, 8, 142, UI_HEADER_H - 16, TFT_BLACK);
+  drawUiTextRight(formatBatteryStatus(), M5.Display.width() - 16, 16, uiSmallFont(), TFT_WHITE, TFT_BLACK);
+}
+
+void drawFooterFrame() {
+  M5.Display.drawLine(0, M5.Display.height() - UI_FOOTER_H, M5.Display.width(), M5.Display.height() - UI_FOOTER_H, TFT_BLACK);
+  const int btnX = (M5.Display.width() - FOOTER_BUTTON_W) / 2;
+  const int btnY = M5.Display.height() - UI_FOOTER_H + 6;
+  M5.Display.drawRect(btnX, btnY, FOOTER_BUTTON_W, FOOTER_BUTTON_H, TFT_BLACK);
+}
+
+void drawFooterDynamic() {
   String ts = formatFooterTime();
   String net = (WiFi.status() == WL_CONNECTED) ? ui_text::kWifiOk : ui_text::kWifiNg;
   String mq = mqttClient.connected() ? ui_text::kMqttOk : ui_text::kMqttNg;
@@ -794,11 +806,29 @@ void drawFooter() {
   const int btnY = M5.Display.height() - UI_FOOTER_H + 6;
   const char* btnLabel = (g_currentSlide == STATUS_SCREEN_INDEX) ? ui_text::kBackButton : ui_text::kStatusButton;
 
-  M5.Display.drawLine(0, M5.Display.height() - UI_FOOTER_H, M5.Display.width(), M5.Display.height() - UI_FOOTER_H, TFT_BLACK);
+  M5.Display.fillRect(0, M5.Display.height() - UI_FOOTER_H + 1, btnX - 8, UI_FOOTER_H - 2, TFT_WHITE);
+  M5.Display.fillRect(btnX + 1, btnY + 1, FOOTER_BUTTON_W - 2, FOOTER_BUTTON_H - 2, TFT_WHITE);
+  M5.Display.fillRect(btnX + FOOTER_BUTTON_W + 8, M5.Display.height() - UI_FOOTER_H + 1,
+                      M5.Display.width() - (btnX + FOOTER_BUTTON_W + 8), UI_FOOTER_H - 2, TFT_WHITE);
   M5.Display.drawString(ts, UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
   drawUiTextCenter(btnLabel, btnX + FOOTER_BUTTON_W / 2, btnY + 4, uiSmallFont());
-  M5.Display.drawRect(btnX, btnY, FOOTER_BUTTON_W, FOOTER_BUTTON_H, TFT_BLACK);
   M5.Display.drawRightString(net + "  " + mq, M5.Display.width() - UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
+}
+
+void clearContentArea() {
+  M5.Display.fillRect(0, UI_HEADER_H + 1, M5.Display.width(),
+                      M5.Display.height() - UI_HEADER_H - UI_FOOTER_H - 1, TFT_WHITE);
+}
+
+const char* currentSlideTitle() {
+  switch (g_currentSlide) {
+    case 0: return ui_text::kSlide1Title;
+    case 1: return ui_text::kSlide2Title;
+    case 2: return ui_text::kSlide3Title;
+    case 3: return ui_text::kSlide4Title;
+    case STATUS_SCREEN_INDEX: return ui_text::kStatusTitle;
+    default: return ui_text::kSlide1Title;
+  }
 }
 
 bool footerButtonContains(int x, int y) {
@@ -1292,8 +1322,7 @@ void drawSimpleLineGraphFloat(int x, int y, int w, int h, const MonoIcon& icon,
   }
 }
 
-void drawSlideSummary() {
-  drawHeader(ui_text::kSlide1Title);
+void drawSlideSummaryBody() {
   const int cardW = M5.Display.width() - UI_MARGIN_X * 2;
   const int currentY = 92;
   const int currentH = 278;
@@ -1340,12 +1369,9 @@ void drawSlideSummary() {
   drawPatternSummaryRow(innerX, 704, ui_text::kRainPattern, pArrow, hArrow, lArrow, lightActive, true);
   drawUiTextLeft(lightActive ? ui_text::kDayRule : ui_text::kNightRule,
                  innerX + 76, 748, uiSmallFont());
-
-  drawFooter();
 }
 
-void drawSlideSignals() {
-  drawHeader(ui_text::kSlide2Title);
+void drawSlideSignalsBody() {
 
   String pArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).pressure - g_envHist.at(0).pressure : NAN);
   String hArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).humidity - g_envHist.at(0).humidity : NAN);
@@ -1372,13 +1398,9 @@ void drawSlideSignals() {
                  UI_MARGIN_X + 76, 724, uiSmallFont());
   drawUiTextLeft(ui_text::kWhatChangedFirst, UI_MARGIN_X + 18, 774, uiSmallFont());
   drawUiTextRight(ui_text::kRainComing, M5.Display.width() - UI_MARGIN_X - 34, 774, uiSmallFont());
-
-  drawFooter();
 }
 
-void drawTrendGraphsSlide(const char* title, uint32_t targetWindowMin, const char* prompt) {
-  drawHeader(title);
-
+void drawTrendGraphsBody(uint32_t targetWindowMin, const char* prompt) {
   size_t envN = collectEnvWindow(g_pressureGraphVals, g_humidityGraphVals, g_envGraphTs, targetWindowMin);
   size_t luxN = collectLuxWindow(g_luxGraphVals, g_luxGraphTs, targetWindowMin);
 
@@ -1422,20 +1444,17 @@ void drawTrendGraphsSlide(const char* title, uint32_t targetWindowMin, const cha
   drawSummaryIconRow(ICON_PRESSURE, ui_text::kPres, formatFloat1(g_env4.pressure) + " hPa", UI_MARGIN_X + 16, 772);
   drawSummaryIconRow(ICON_HUMIDITY, ui_text::kHum, formatFloat1(g_env4.humidity) + " %", UI_MARGIN_X + 16, 804);
   drawSummaryIconRow(ICON_LIGHT, ui_text::kLux, formatFloat1(g_luxRaw.lux), UI_MARGIN_X + 16, 836);
-
-  drawFooter();
 }
 
-void drawSlideGraphsShort() {
-  drawTrendGraphsSlide(ui_text::kSlide3Title, SHORT_WINDOW_MIN, ui_text::kShortPrompt);
+void drawSlideGraphsShortBody() {
+  drawTrendGraphsBody(SHORT_WINDOW_MIN, ui_text::kShortPrompt);
 }
 
-void drawSlideGraphsLong() {
-  drawTrendGraphsSlide(ui_text::kSlide4Title, LONG_WINDOW_MIN, ui_text::kLongPrompt);
+void drawSlideGraphsLongBody() {
+  drawTrendGraphsBody(LONG_WINDOW_MIN, ui_text::kLongPrompt);
 }
 
-void drawSlideStatus() {
-  drawHeader(ui_text::kStatusTitle);
+void drawSlideStatusBody() {
   const int cardW = M5.Display.width() - UI_MARGIN_X * 2;
   const int healthX = UI_MARGIN_X + 18;
   const int healthRight = M5.Display.width() - UI_MARGIN_X - 22;
@@ -1478,19 +1497,27 @@ void drawSlideStatus() {
     drawUiTextCenter(ui_text::kWarningSensorMqtt, M5.Display.width() / 2, warnY + 16, uiSmallFont(), TFT_WHITE, TFT_BLACK);
     M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
   }
-
-  drawFooter();
 }
 
-void renderSlide() {
-  switch (g_currentSlide) {
-    case 0: drawSlideSummary(); break;
-    case 1: drawSlideSignals(); break;
-    case 2: drawSlideGraphsShort(); break;
-    case 3: drawSlideGraphsLong(); break;
-    case STATUS_SCREEN_INDEX: drawSlideStatus(); break;
-    default: drawSlideSummary(); break;
+void renderSlide(bool fullFrame) {
+  if (fullFrame) {
+    drawHeaderFrame(currentSlideTitle());
+    drawFooterFrame();
+  } else {
+    clearContentArea();
   }
+
+  switch (g_currentSlide) {
+    case 0: drawSlideSummaryBody(); break;
+    case 1: drawSlideSignalsBody(); break;
+    case 2: drawSlideGraphsShortBody(); break;
+    case 3: drawSlideGraphsLongBody(); break;
+    case STATUS_SCREEN_INDEX: drawSlideStatusBody(); break;
+    default: drawSlideSummaryBody(); break;
+  }
+
+  drawHeaderDynamic();
+  drawFooterDynamic();
 }
 
 // ---------------------- setup / loop -------------------------
@@ -1620,12 +1647,14 @@ void loop() {
   if (g_needRedraw && (nowMs - g_lastRefreshMs >= EPD_REFRESH_MS || manualRefresh)) {
     Serial.printf("[LOOP] render slide=%u now=%lu last=%lu\n", g_currentSlide, (unsigned long)nowMs, (unsigned long)g_lastRefreshMs);
     g_renderInProgress = true;
-    renderSlide();
+    bool fullFrame = manualRefresh || g_lastRenderedSlide != g_currentSlide || g_lastRenderedSlide == 255;
+    renderSlide(fullFrame);
     Serial.println("[LOOP] render done");
     uint32_t doneMs = millis();
     g_lastRefreshMs = doneMs;
     g_needRedraw = false;
     g_renderInProgress = false;
+    g_lastRenderedSlide = g_currentSlide;
   }
 
   delay(20);
