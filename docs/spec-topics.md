@@ -86,7 +86,7 @@
 ### `home/env/lux/status`
 
 ```json
-{"status":"ok","reason":"boot","wifi":"connected","ip":"192.168.0.122","sensor_ready":true,"sensor_error_count":0,"wifi_reconnect_count":1,"mqtt_reconnect_count":1,"uptime_s":6,"seq":0,"unix_time":1775014836,"time_valid":true}
+{"status":"ok","reason":"boot","wifi":"connected","ip":"192.168.0.2","sensor_ready":true,"sensor_error_count":0,"wifi_reconnect_count":1,"mqtt_reconnect_count":1,"uptime_s":6,"seq":0,"unix_time":1775014836,"time_valid":true}
 ```
 
 ## 保持方針

@@ -9,7 +9,7 @@ static constexpr const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 
 // MQTT broker settings.
 // `MQTT_BROKER` can be a local IP address or a hostname reachable from the device.
-static constexpr const char* MQTT_BROKER = "192.168.3.82";
+static constexpr const char* MQTT_BROKER = "broker.local";
 static constexpr uint16_t    MQTT_PORT   = 1883;
 
 // NTP / timezone / site location.
