@@ -4,6 +4,8 @@
 
 [English README](./README.md)
 
+[統合ハブ](../../projects/m5papers3-weather-learning-system/README.ja.md)
+
 ## 概要
 
 このスケッチは **M5PaperS3** 上で動作し、縦置きの教材用ダッシュボードを表示します。対象データは次の2系統です。

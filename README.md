@@ -4,6 +4,8 @@
 
 [README日本語版](./README.ja.md)
 
+[Integration Hub](../../projects/m5papers3-weather-learning-system/README.md)
+
 ## Overview
 
 This sketch runs on **M5PaperS3** and shows a portrait teaching dashboard for reading weather clues from:
