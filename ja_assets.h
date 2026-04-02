@@ -3,13 +3,13 @@
 #include <M5Unified.h>
 
 // Japanese-capable font aliases prepared for future localization work.
-// These use built-in M5GFX U8g2 fonts, so no SD assets are required.
+// These use built-in M5GFX Japanese Gothic fonts, so no SD assets are required.
 namespace ja_assets {
 
-static constexpr const lgfx::IFont* kLabelFont = &fonts::lgfxJapanGothicP_12;
-static constexpr const lgfx::IFont* kBodyFont = &fonts::lgfxJapanGothicP_16;
-static constexpr const lgfx::IFont* kTitleFont = &fonts::lgfxJapanGothicP_20;
-static constexpr const lgfx::IFont* kHeadlineFont = &fonts::lgfxJapanGothicP_24;
+static constexpr const lgfx::IFont* kLabelFont = &fonts::lgfxJapanGothic_12;
+static constexpr const lgfx::IFont* kBodyFont = &fonts::lgfxJapanGothic_16;
+static constexpr const lgfx::IFont* kTitleFont = &fonts::lgfxJapanGothic_20;
+static constexpr const lgfx::IFont* kHeadlineFont = &fonts::lgfxJapanGothic_24;
 
 // Current UI vocabulary expected during the Japanese localization phase.
 static constexpr const char* kPreparedTerms[] = {
