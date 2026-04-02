@@ -7,6 +7,7 @@
 
 #include "config.h"
 #include "icons.h"
+#include "ja_assets.h"
 
 // ============================================================
 // M5PaperS3 MQTT Slide Dashboard

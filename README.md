@@ -152,6 +152,7 @@ It shows two diagnostic cards:
   - `fonts::Font2`
   - `fonts::Font4`
   - `fonts::Font6`
+- Built-in Japanese-capable font aliases are prepared in [ja_assets.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ja_assets.h) for a future localization phase
 - A small built-in monochrome icon set is provided in [icons.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/icons.h)
 - No SD-backed emoji or external icon font is required
 - Header right side shows battery level as `BAT xx%`
@@ -198,6 +199,7 @@ Sunrise / sunset are estimated locally from the configured site position:
 - [M5PaperS3-LuxEnv-Slides.ino](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/M5PaperS3-LuxEnv-Slides.ino)
 - [config.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/config.h)
 - [icons.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/icons.h)
+- [ja_assets.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ja_assets.h)
 
 You can copy [config.example.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/config.example.h) to `config.h` and fill in your settings.
 
