@@ -1,4 +1,4 @@
-# MQTT Topic Spec
+# MQTT トピック仕様
 
 ## MQTT topic 一覧
 

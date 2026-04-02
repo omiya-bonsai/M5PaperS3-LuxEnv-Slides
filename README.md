@@ -1,205 +1,169 @@
 # M5PaperS3 Lux / Env Slides
 
+[README日本語版](./README.ja.md)
+
 ## Overview
 
-This sketch runs on **M5PaperS3** and shows a portrait teaching dashboard for reading environmental change.
+This sketch runs on **M5PaperS3** and shows a portrait teaching dashboard for reading weather clues from:
 
-The learning goal is:
+- outdoor pressure / humidity / temperature from `env4`
+- window-side light data from `home/env/lux/*`
 
-- read current outdoor and window-side conditions
-- notice recent changes over time
-- compare pressure, humidity, and light together
-- think about whether rain may be getting closer
+The goal is **not** precise weather prediction.  
+The goal is to help a junior-high-school student learn how to read:
 
-This is **not** an automated forecast app. It is a teaching UI for observing clues and making simple inferences.
+- current values
+- recent changes
+- short-term trends
+- long-term trends
+
+and think: **"Is rain getting closer?"**
 
 ## Current UI State
 
-- English UI exists as a stable baseline
-- Japanese UI is now readable on device
-- current work is final Japanese layout polishing
-- slide roles are fixed and no longer changing significantly
+- Portrait layout is the default UI
+- English and Japanese UI can be switched from `config.h`
+- Main loop uses four teaching slides
+- Network/status is a secondary screen opened from the footer button
 
 ## MQTT Topics
 
-The sketch subscribes to:
+Subscribed topics:
 
 - `env4`
 - `home/env/lux/raw`
 - `home/env/lux/meta`
 - `home/env/lux/status`
 
-Meaning:
+See topic details:
 
-- `env4`: outdoor temperature / humidity / pressure
-- `home/env/lux/raw`: current lux
-- `home/env/lux/meta`: lux average / delta / rate / trend
-- `home/env/lux/status`: sensor and network health
-
-See also: [docs/spec-topics.md](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/docs/spec-topics.md)
+- [MQTT topic spec](./docs/spec-topics.md)
 
 ## Storage
 
-The microSD card is used for persistence and graph continuity.
+The sketch stores data on SD card:
 
 - `/logs/env4_log.csv`
 - `/logs/lux_log.csv`
 - `/state/latest.json`
 
-Current behavior:
+Behavior:
 
-- append CSV logs while running
-- cache latest received values
-- restore latest cached state on boot
-- restore recent graph history from CSV on boot
-- discard restored graph history if it is too old compared with the first live MQTT time
-
-SD access is initialized with explicit SPI settings:
-
-- PaperS3 SD CS: `GPIO_NUM_47`
-- SPI clock: `40 MHz`
+- latest values are restored from `latest.json`
+- graph history is restored from CSV logs on boot
+- stale CSV history can be discarded after comparing with live MQTT time
 
 ## Slides
 
-### Slide 1: Current / 現在値
+### Slide 1: Current
 
 Shows:
 
-- current values in a 2x2 grid
-- recent changes for pressure / humidity / light
-- rain-sign count
-- current pattern vs rain-pattern reference
+- current temperature
+- current humidity
+- current pressure
+- current light level
+- recent changes
+- rain-sign summary
 
-### Slide 2: Signals / 変化のサイン
-
-Shows:
-
-- direction of recent change for pressure / humidity / light
-- a centered gauge for each signal
-- an interpretation card
-- rain-sign count
-- current pattern summary
-- a reference rain pattern
-- a short guiding question
-
-### Slide 3: Short-Term / 短期傾向
+### Slide 2: Signals
 
 Shows:
 
-- short-term rolling graphs for pressure / humidity / lux
-- current values summary strip
-- question: `What is changing now?` / `今、何が変化している？`
+- direction of change for pressure / humidity / light
+- sign strength bars
+- a teaching card that helps the user compare:
+  - current pattern
+  - rain-sign pattern
+  - question prompt
 
-Target window:
-
-- `15 min`
-
-### Slide 4: Long-Term / 長期傾向
+### Slide 3: Short-Term (15 min)
 
 Shows:
 
-- long-term rolling graphs for pressure / humidity / lux
-- current values summary strip
-- question: `Is the trend continuing?` / `今までの流れは続いている？`
+- short-term pressure graph
+- short-term humidity graph
+- short-term light graph
+- current summary
 
-Target window:
+Purpose:
 
-- `120 min`
+- "What is changing now?"
 
-### Status Screen / ネットワーク
+### Slide 4: Long-Term (120 min)
 
-Status is a separate auxiliary screen, not part of the normal 4-slide loop.
+Shows:
 
-It shows two diagnostic cards:
+- long-term pressure graph
+- long-term humidity graph
+- long-term light graph
+- current summary
 
-- `HEALTH`
-- `NETWORK`
+Purpose:
+
+- "Is the trend continuing?"
+
+### Network Screen
+
+Opened from the footer button or upward swipe.
+
+Shows:
+
+- sensor state
+- Wi-Fi state
+- IP address
+- retry / error counts
+- updated time
 
 ## UI Notes
 
-- Portrait layout: `setRotation(0)`
-- UI language can be switched in `config.h`
-  - English
-  - Japanese
-- UI text is centralized in [ui_text.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ui_text.h)
-- Japanese-capable font aliases are provided in [ja_assets.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ja_assets.h)
-- A small built-in monochrome icon set is provided in [icons.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/icons.h)
-- Numeric text and Japanese text use separate drawing paths
-  - numeric values keep the Latin fonts
-  - labels and helper text use Japanese-capable drawing helpers
-- Header right side shows battery level as `BAT xx%`
-- Footer left side shows JST time converted from received MQTT unix time
-- If no valid live time has been received yet, the footer shows `--:--`
+- `Light` is treated as a **daytime clue**
+- after sunset / before sunrise, and after sustained darkness, light can be excluded from rain-sign counting
+- short-term and long-term graph windows are intentionally different:
+  - 15 min
+  - 120 min
 
 ## Navigation
 
-- `BtnA`: previous slide
-- `BtnB`: force redraw
-- `BtnC`: next slide
-
-Slides auto-rotate across the 4 teaching slides.
-
-The footer center button opens:
-
-- `STATUS / ネットワーク` from the teaching slides
-- `BACK` from the status screen
-
-There is also a swipe-up gesture from the footer area to open the status screen.
-
-## Night Mode
-
-`Light` is not always used as a rain clue.
-
-During night mode:
-
-- rain signs use `pressure + humidity`
-- the denominator changes from `/3` to `/2`
-- `Light` is shown as skipped for interpretation
-
-Night mode is enabled only when both are true:
-
-- local time is after sunset or before sunrise
-- low lux continues for a sustained period
-
-Sunrise / sunset are estimated locally from:
-
-- `CONFIG_SITE_LATITUDE`
-- `CONFIG_SITE_LONGITUDE`
-
-Night mode affects interpretation only.
+- normal loop: Slide 1 -> Slide 2 -> Slide 3 -> Slide 4
+- footer center button: open `Network`
+- footer center button on network screen: back
+- upward swipe from bottom area: open `Network`
 
 ## Required Files
 
-- [M5PaperS3-LuxEnv-Slides.ino](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/M5PaperS3-LuxEnv-Slides.ino)
-- [config.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/config.h)
-- [icons.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/icons.h)
-- [ja_assets.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ja_assets.h)
-- [ui_text.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ui_text.h)
-
-You can copy [config.example.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/config.example.h) to `config.h` and fill in your settings.
+- [M5PaperS3-LuxEnv-Slides.ino](./M5PaperS3-LuxEnv-Slides.ino)
+- [config.h](./config.h)
+- [config.example.h](./config.example.h)
+- [ui_text.h](./ui_text.h)
+- [ja_assets.h](./ja_assets.h)
+- [icons.h](./icons.h)
 
 ## Required Libraries
 
 - `M5Unified`
 - `M5GFX`
+- `WiFi`
 - `PubSubClient`
 - `ArduinoJson`
+- `SD`
 
 ## Build Notes
 
-- Board: `M5PaperS3`
-- `#include <SD.h>` must stay before `#include <M5Unified.h>`
-- unsupported fonts such as `Font5` are avoided
-- build target:
-  - `m5stack:esp32:m5stack_papers3`
+Important notes are collected here:
 
-See also: [docs/build-notes.md](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/docs/build-notes.md)
+- [Build notes](./docs/build-notes.md)
+
+## More Docs
+
+- [Handoff](./docs/handoff.md)
+- [UI plan](./docs/ui-plan.md)
+- [Decision log](./docs/decision-log.md)
 
 ## Current Focus
 
-The main focus is no longer basic functionality. The main focus is:
+Current state:
 
-- Japanese UI readability
-- visual hierarchy
-- slide-to-slide teaching flow
-- helping the reader compare multiple clues together
+- English UI is stable
+- Japanese UI is available in the same repository
+- the main remaining work is Japanese layout refinement and small readability improvements

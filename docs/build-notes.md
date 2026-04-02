@@ -1,6 +1,6 @@
-# Build Notes
+# ビルドメモ
 
-## Board設定
+## ボード設定
 
 - Board: `M5PaperS3`
 - FQBN:

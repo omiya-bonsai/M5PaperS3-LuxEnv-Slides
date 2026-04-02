@@ -1,189 +1,196 @@
-# Decision Log
+# 判断記録
 
-## Purpose
+## 目的
 
-This file records major design decisions for the M5PaperS3 Lux / Env Slides project.
-The goal is to preserve why key choices were made, not just what the current code does.
+このファイルは、M5PaperS3 Lux / Env Slides プロジェクトで行った主要な設計判断と、その理由を残すための記録です。
 
-## Decision History
+## 判断履歴
 
-### 1. Keep the project focused on teaching, not forecasting
+### 1. 目的は高精度予報ではなく教材にする
 
-- Decision:
-  - Treat the UI as a teaching tool for observing environmental clues.
-  - Do not turn it into a high-confidence automated rain prediction system.
-- Reason:
-  - The core learning goal is to help a middle-school student compare pressure, humidity, and light and think about what they mean together.
+判断:
+- このプロジェクトは「雨が近いかもしれない」と考える体験を作る教材とする
 
-### 2. Use a portrait layout
+理由:
+- センサ値から自然現象を読む体験を重視するため
+- 正解表示よりも観察と推理を優先するため
 
-- Decision:
-  - Use portrait orientation on M5PaperS3.
-- Reason:
-  - The content is read top-to-bottom more naturally than left-to-right.
-  - Portrait layout made it easier to assign one role to each slide and avoid wasted right-side space.
+### 2. 画面構成は複数スライドに分ける
 
-### 3. Separate the UI into 4 teaching slides plus an auxiliary status screen
+判断:
+- 1画面に全情報を詰め込まず、役割ごとにスライドを分ける
 
-- Decision:
-  - Normal slide loop:
-    1. Current
-    2. Signals
-    3. Short-term
-    4. Long-term
-  - Status is not part of the normal loop.
-- Reason:
-  - The first four slides are for teaching flow.
-  - Status is operational information and should not interrupt the learning sequence.
+理由:
+- 中学生が段階的に読めるようにするため
+- 現在値、変化、短期傾向、長期傾向を分離した方が理解しやすいため
 
-### 4. Keep `Status` as a footer-accessed auxiliary screen
+### 3. 横置きではなく縦置きを採用する
 
-- Decision:
-  - Open the auxiliary network/status screen only from the footer button or swipe-up gesture.
-- Reason:
-  - Status information is useful, but lower priority than the learning slides.
-  - This keeps the main loop focused on observation and inference.
+判断:
+- M5PaperS3 の表示は縦置きを基本にする
 
-### 5. Use short-term and long-term graph windows separately
+理由:
+- 上から下へ読む教材UIと相性が良いため
+- 右側の余白問題を避けやすいため
 
-- Decision:
-  - Slide 3 shows short-term trends over 15 minutes.
-  - Slide 4 shows long-term trends over 120 minutes.
-- Reason:
-  - Short-term trends help answer “What is changing now?”
-  - Long-term trends help answer “Is the trend continuing?”
+### 4. 通常ループは4枚の教材スライドに固定する
 
-### 6. Restore graph history from CSV logs at boot
+判断:
+- 通常表示は `現在値 / 変化のサイン / 短期傾向 / 長期傾向` の4枚とする
 
-- Decision:
-  - Use SD CSV logs to rebuild recent graph history after reboot or reflashing.
-- Reason:
-  - Without CSV restore, graphs would always start empty after flashing.
-  - CSV restore gives continuity for short-term and long-term slides.
+理由:
+- 役割分担が明快になるため
+- 状態画面を主役にしないため
 
-### 7. Discard restored CSV history when it is too old
+### 5. ネットワーク画面は補助画面にする
 
-- Decision:
-  - Compare restored history with the first live MQTT time and discard stale graph history if the gap is too large.
-- Reason:
-  - Old graph data can be misleading after the device has been powered off for a long time.
-  - It is better to show an empty graph than imply that stale history is current.
+判断:
+- `Status` 画面は通常ループに含めず、フッター操作でのみ開く補助画面にする
 
-### 8. Use received Unix time for footer time display
+理由:
+- 教材としての主役は観測と推理だから
+- 通信状態は必要だが常時見せる優先度は低いため
 
-- Decision:
-  - Use live MQTT `unix_time` / `ts` for footer time, converted to JST.
-  - Do not wait for M5PaperS3 local NTP stabilization before showing time.
-- Reason:
-  - Sender-side timestamps are already meaningful and arrive earlier than a stable local clock.
-  - This avoids long `--:--` periods after boot.
+### 6. 短期傾向と長期傾向を分ける
 
-### 9. Keep Wi-Fi because MQTT is required
+判断:
+- `Slide 3` は短期 15 分
+- `Slide 4` は長期 120 分
 
-- Decision:
-  - Keep Wi-Fi enabled even if local NTP is not the main time source.
-- Reason:
-  - MQTT depends on Wi-Fi in the current architecture.
-  - Power saving is lower priority because the device is expected to remain powered.
+理由:
+- 「今の変化」と「流れの継続」は別の意味を持つため
+- 明るさは短期で読みやすく、気圧は長期で意味が出やすいため
 
-### 10. Use SD at explicit 40 MHz SPI
+### 7. 変化方向は文字と記号で補助する
 
-- Decision:
-  - Initialize SD with explicit CS and SPI speed:
-    - `GPIO_NUM_47`
-    - `40000000`
-- Reason:
-  - SD stability is better when the SPI configuration is explicit.
+判断:
+- `ASCEND / DESCEND / STEADY` と矢印やゲージを組み合わせて見せる
 
-### 11. Night mode should exclude light from rain-sign counting
+理由:
+- E-Ink では色による説明が使いにくいため
+- 直感的な理解を助けるため
 
-- Decision:
-  - Exclude `Light` from `Rain signs` at night.
-  - Change denominator from `/3` to `/2` during confirmed night mode.
-- Reason:
-  - After sunset, low lux is normal and should not be interpreted as a rain clue.
+### 8. ゲージは連続量にだけ使う
 
-### 12. Use time + sustained low lux for night mode
+判断:
+- ゲージは変化量や方向の補助に使い、`Wi-Fi` や `MQTT` のような二値状態には使わない
 
-- Decision:
-  - Night mode requires:
-    - local time in the night band
-    - sustained low lux for a period
-- Reason:
-  - Time alone is too rigid.
-  - Lux alone is too noisy.
-  - Combining both reduces false night-mode activation.
+理由:
+- 不要な視覚ノイズを減らすため
+- 状態表示は文字で十分だから
 
-### 13. Estimate sunrise and sunset locally from configured coordinates
+### 9. グラフは短期と長期で描画負荷を分ける
 
-- Decision:
-  - Compute sunrise and sunset in the sketch using configured site latitude and longitude.
-- Reason:
-  - This avoids adding another online dependency or API just for day/night interpretation.
+判断:
+- 長期グラフは圧縮描画し、短期グラフは高密度のまま描く
 
-### 14. Keep location in `config.h`
+理由:
+- E-Ink の描画負荷を抑えるため
+- 長期傾向は細かいノイズより全体方向が重要なため
 
-- Decision:
-  - Move site latitude and longitude into configuration.
-- Reason:
-  - The project should not hardcode a specific site in the main sketch.
+### 10. 起動後もグラフ履歴を復元する
 
-### 15. Use monochrome built-in icons instead of emoji fonts
+判断:
+- SD の CSV ログから履歴を復元し、再起動後もグラフを継続表示できるようにする
 
-- Decision:
-  - Use `icons.h` with monochrome symbols rather than external emoji fonts.
-- Reason:
-  - Emoji/font support is unstable and heavy in this environment.
-  - The built-in icons are lighter and better suited to E-Ink.
+理由:
+- フラッシュ後にグラフが空になる体験を避けるため
 
-### 16. Simplify `LUX RATE` out of the main teaching UI
+### 11. 古い履歴は採用しない
 
-- Decision:
-  - Remove `LUX RATE` from the main UI emphasis.
-- Reason:
-  - It added calculation-heavy information but did not help intuitive understanding as much as direction and pattern did.
+判断:
+- CSV 履歴はライブ受信時刻と比較し、古すぎる場合は破棄する
 
-### 17. Prefer “current pattern vs rain pattern” over raw symbolic shorthand
+理由:
+- 数時間前や前日の履歴を「今の傾向」と誤解させないため
 
-- Decision:
-  - Show a compact current pattern and a reference rain pattern rather than only symbolic shorthand like `P v H ^ L v`.
-- Reason:
-  - Direct comparison is easier for students than decoding compact notation alone.
+### 12. フッター日時は受信した Unix time を使う
 
-### 18. Keep English and Japanese in the same repository
+判断:
+- M5PaperS3 自身の NTP 安定待ちではなく、受信データの `unix_time / ts` を JST に変換して表示する
 
-- Decision:
-  - Maintain both English and Japanese UI modes in the same repo.
-- Reason:
-  - The logic is shared.
-  - Separate repos would duplicate maintenance and increase drift risk.
+理由:
+- 送信側がすでに正しい時刻を持っているため
+- 起動直後の長い `--:--` を避けられるため
 
-### 19. Localize in phases
+### 13. バッテリー残量はヘッダー右上に置く
 
-- Decision:
-  - Proceed in phases:
-    1. text table extraction
-    2. Japanese text set
-    3. Japanese-capable drawing path
-    4. Japanese layout tuning
-- Reason:
-  - This makes it easier to isolate issues and keeps the English baseline stable.
+判断:
+- ヘッダー右上に `BAT xx%` を表示する
 
-### 20. Use separate drawing paths for numeric values and Japanese text
+理由:
+- 補助情報として見やすく、スライド主役を邪魔しないため
 
-- Decision:
-  - Keep Latin numeric fonts for numbers, units, and timestamps.
-  - Use Japanese-capable drawing for labels and helper text.
-- Reason:
-  - Numeric readability was already good.
-  - Japanese text required a different rendering path.
+### 14. 夜間は明るさを雨判定から外す
 
-## Current Direction
+判断:
+- 夜間候補かつ低照度継続時には、`Light` を雨の手がかり集計から外す
 
-The current development focus is:
+理由:
+- 夜は暗いこと自体が自然であり、雨雲の影響と区別できないため
 
-- finishing Japanese UI readability
-- tightening Slide 1 and Slide 2 helper areas
-- keeping Slide 3 and Slide 4 stable
-- keeping terminology consistent in Japanese (`明るさ`, `雨の手がかり`, `雨が近い並び`, `もうすぐ雨が降るかな？`)
-- maintaining the project as a learning tool rather than expanding operational features
+### 15. 夜間判定は時刻と照度の両方で行う
+
+判断:
+- `日没後/日の出前` だけではなく、`lux` の低照度継続も条件に含める
+
+理由:
+- 日没直後のまだ明るい時間や、一時的な暗さを誤判定しないため
+
+### 16. 位置情報は `config.h` に出す
+
+判断:
+- 緯度・経度はスケッチ直書きではなく `config.h` で管理する
+
+理由:
+- 地域変更をしやすくするため
+- 日の出・日没計算を設定可能にするため
+
+### 17. 英語版と日本語版は同一リポジトリで管理する
+
+判断:
+- 別リポジトリに分けず、同一リポジトリで `config.h` により言語切替する
+
+理由:
+- バグ修正や機能追加を二重管理しないため
+- 表示言語だけを分岐させれば十分だから
+
+### 18. 日本語化は段階的に進める
+
+判断:
+- `日本語資産準備 -> 文言テーブル化 -> 日本語文言追加 -> レイアウト調整` の順で進める
+
+理由:
+- どこで壊れたか追いやすいため
+- 英語版の安定状態を保ちやすいため
+
+### 19. 日本語と数値は別フォントで扱う
+
+判断:
+- 日本語文言と、数値・単位・時刻を別系統で描画する
+
+理由:
+- 数字は既存フォントの方が見やすいため
+- 日本語は日本語対応フォント経路が必要なため
+
+### 20. 教材補助は「比較」と「問い」を重視する
+
+判断:
+- `今`
+- `雨が近い並び`
+- `何が先に変わった？`
+- `もうすぐ雨が降るかな？`
+
+のように、比較と問いをUIに入れる
+
+理由:
+- 正解を出しすぎず、考える流れを作るため
+- 中学生が推理の形で学べるようにするため
+
+## 現在の方針
+
+現在の方針は次のとおりです。
+
+- 英語版は安定版として保持する
+- 日本語版は同一リポジトリ内で仕上げる
+- 主要な機能追加は一段落しており、今後は読みやすさや表現の微調整が中心
