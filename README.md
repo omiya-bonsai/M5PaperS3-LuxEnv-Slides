@@ -25,6 +25,8 @@ and think: **"Is rain getting closer?"**
 - English and Japanese UI can be switched from `config.h`
 - Main loop uses four teaching slides
 - Network/status is a secondary screen opened from the footer button
+- Monochrome icons are stored in `icons.h` and currently rendered at `32x32`
+- Same-slide updates reuse header/footer framing and redraw the slide body only
 
 ## MQTT Topics
 
@@ -119,6 +121,8 @@ Shows:
 
 - `Light` is treated as a **daytime clue**
 - after sunset / before sunrise, and after sustained darkness, light can be excluded from rain-sign counting
+- the daytime clue text is shown as:
+  - `Pressure down  Humidity up  Light down in daytime`
 - short-term and long-term graph windows are intentionally different:
   - 15 min
   - 120 min
@@ -167,4 +171,6 @@ Current state:
 
 - English UI is stable
 - Japanese UI is available in the same repository
-- the main remaining work is Japanese layout refinement and small readability improvements
+- 32px icons and slide-transition stability fixes are already reflected
+- redraw work for same-slide updates has been reduced by reusing header/footer framing
+- the main remaining work is layout refinement and additional redraw optimization inside slide bodies
