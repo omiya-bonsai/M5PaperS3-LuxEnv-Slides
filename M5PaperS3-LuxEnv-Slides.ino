@@ -1274,9 +1274,9 @@ void drawSlideSummary() {
   drawHeader(ui_text::kSlide1Title);
   const int cardW = M5.Display.width() - UI_MARGIN_X * 2;
   const int currentY = 92;
-  const int currentH = 308;
-  const int changeY = 440;
-  const int changeH = 452;
+  const int currentH = 294;
+  const int changeY = 424;
+  const int changeH = 468;
   const int innerX = UI_MARGIN_X + 20;
   const int innerW = cardW - 40;
   const int colGap = 34;
@@ -1307,17 +1307,17 @@ void drawSlideSummary() {
   drawMetricWithIcon(ICON_PRESSURE, ui_text::kPres, formatFloat1(g_env4.pressure), "hPa", rightColX, 248, rightUnitX);
 
   drawCard(UI_MARGIN_X, changeY, cardW, changeH, ui_text::kRecentChanges);
-  drawChangeSummaryRow(ICON_PRESSURE, ui_text::kPressure, pArrow, 492);
-  drawChangeSummaryRow(ICON_HUMIDITY, ui_text::kHumidity, hArrow, 550);
-  drawChangeSummaryRow(ICON_LIGHT, ui_text::kLight, lightDisplay, 608);
-  M5.Display.drawLine(innerX, 680, UI_MARGIN_X + cardW - 20, 680, TFT_BLACK);
+  drawChangeSummaryRow(ICON_PRESSURE, ui_text::kPressure, pArrow, 474);
+  drawChangeSummaryRow(ICON_HUMIDITY, ui_text::kHumidity, hArrow, 532);
+  drawChangeSummaryRow(ICON_LIGHT, ui_text::kLight, lightDisplay, 590);
+  M5.Display.drawLine(innerX, 658, UI_MARGIN_X + cardW - 20, 658, TFT_BLACK);
   char rainSignsBuf[32];
   snprintf(rainSignsBuf, sizeof(rainSignsBuf), ui_text::kRainSignsFmt, rainSigns, rainDenom);
-  drawUiTextLeft(rainSignsBuf, innerX, 712, uiBodyFont());
-  drawPatternSummaryRow(innerX, 754, ui_text::kNow, pArrow, hArrow, lArrow, lightActive, false);
-  drawPatternSummaryRow(innerX, 794, ui_text::kRainPattern, pArrow, hArrow, lArrow, lightActive, true);
+  drawUiTextLeft(rainSignsBuf, innerX, 690, uiBodyFont());
+  drawPatternSummaryRow(innerX, 726, ui_text::kNow, pArrow, hArrow, lArrow, lightActive, false);
+  drawPatternSummaryRow(innerX, 764, ui_text::kRainPattern, pArrow, hArrow, lArrow, lightActive, true);
   drawUiTextLeft(lightActive ? ui_text::kDayRule : ui_text::kNightRule,
-                 innerX + 76, 836, uiSmallFont());
+                 innerX + 76, 812, uiSmallFont());
 
   drawFooter();
 }
@@ -1339,15 +1339,15 @@ void drawSlideSignals() {
   drawSignalRow(ICON_HUMIDITY, ui_text::kHumidity, hArrow, normalizedHumidityTrend(), 262);
   drawSignalRow(ICON_LIGHT, ui_text::kLight, lightDisplay, lightActive ? normalizedLuxTrend() : 0.0f, 432);
 
-  drawCard(UI_MARGIN_X, 604, M5.Display.width() - UI_MARGIN_X * 2, 212, ui_text::kInterpret);
-  drawUiTextLeft(ui_text::kCheckOrder, UI_MARGIN_X + 18, 640, uiSmallFont());
+  drawCard(UI_MARGIN_X, 588, M5.Display.width() - UI_MARGIN_X * 2, 230, ui_text::kInterpret);
+  drawUiTextLeft(ui_text::kCheckOrder, UI_MARGIN_X + 18, 624, uiSmallFont());
   char rainSignsBuf[32];
   snprintf(rainSignsBuf, sizeof(rainSignsBuf), ui_text::kRainSignsFmt, rainSigns, rainDenom);
-  drawUiTextLeft(rainSignsBuf, UI_MARGIN_X + 18, 666, uiBodyFont());
-  drawPatternSummaryRow(UI_MARGIN_X + 18, 696, ui_text::kNow, pArrow, hArrow, lArrow, lightActive, false);
-  drawPatternSummaryRow(UI_MARGIN_X + 18, 732, ui_text::kRainPattern, pArrow, hArrow, lArrow, lightActive, true);
+  drawUiTextLeft(rainSignsBuf, UI_MARGIN_X + 18, 652, uiBodyFont());
+  drawPatternSummaryRow(UI_MARGIN_X + 18, 686, ui_text::kNow, pArrow, hArrow, lArrow, lightActive, false);
+  drawPatternSummaryRow(UI_MARGIN_X + 18, 722, ui_text::kRainPattern, pArrow, hArrow, lArrow, lightActive, true);
   drawUiTextLeft(lightActive ? ui_text::kDayRule : ui_text::kNightRule,
-                 UI_MARGIN_X + 76, 770, uiSmallFont());
+                 UI_MARGIN_X + 76, 762, uiSmallFont());
   drawUiTextLeft(ui_text::kWhatChangedFirst, UI_MARGIN_X + 18, 794, uiSmallFont());
   drawUiTextRight(ui_text::kRainComing, M5.Display.width() - UI_MARGIN_X - 34, 794, uiSmallFont());
 
@@ -1391,15 +1391,15 @@ void drawTrendGraphsSlide(const char* title, uint32_t targetWindowMin, const cha
   M5.Display.drawLine(UI_MARGIN_X, 726, M5.Display.width() - UI_MARGIN_X, 726, TFT_BLACK);
   char nowBuf[64];
   snprintf(nowBuf, sizeof(nowBuf), ui_text::kNowPromptFmt, prompt);
-  drawUiTextLeft(nowBuf, UI_MARGIN_X + 4, 744, uiSmallFont());
+  drawUiTextLeft(nowBuf, UI_MARGIN_X + 4, 742, uiSmallFont());
   char windowBuf[96];
   snprintf(windowBuf, sizeof(windowBuf), ui_text::kWindowFmt,
            formatClockOnly(oldestTs).c_str(), formatClockOnly(newestTs).c_str(),
            (unsigned long)spanMin, (unsigned long)targetWindowMin);
-  drawUiTextRight(windowBuf, M5.Display.width() - UI_MARGIN_X, 744, uiSmallFont());
-  drawSummaryIconRow(ICON_PRESSURE, ui_text::kPres, formatFloat1(g_env4.pressure) + " hPa", UI_MARGIN_X + 16, 776);
-  drawSummaryIconRow(ICON_HUMIDITY, ui_text::kHum, formatFloat1(g_env4.humidity) + " %", UI_MARGIN_X + 16, 808);
-  drawSummaryIconRow(ICON_LIGHT, ui_text::kLux, formatFloat1(g_luxRaw.lux), UI_MARGIN_X + 16, 840);
+  drawUiTextRight(windowBuf, M5.Display.width() - UI_MARGIN_X, 742, uiSmallFont());
+  drawSummaryIconRow(ICON_PRESSURE, ui_text::kPres, formatFloat1(g_env4.pressure) + " hPa", UI_MARGIN_X + 16, 774);
+  drawSummaryIconRow(ICON_HUMIDITY, ui_text::kHum, formatFloat1(g_env4.humidity) + " %", UI_MARGIN_X + 16, 806);
+  drawSummaryIconRow(ICON_LIGHT, ui_text::kLux, formatFloat1(g_luxRaw.lux), UI_MARGIN_X + 16, 838);
 
   drawFooter();
 }

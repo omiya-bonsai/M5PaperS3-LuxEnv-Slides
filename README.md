@@ -147,17 +147,23 @@ It shows two diagnostic cards:
 ## UI Notes
 
 - Portrait layout: `setRotation(0)`
-- English UI only
+- UI language can be switched in `config.h`
+  - English
+  - Japanese
 - Fonts are limited to:
   - `fonts::Font2`
   - `fonts::Font4`
   - `fonts::Font6`
-- Built-in Japanese-capable font aliases are prepared in [ja_assets.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ja_assets.h) for a future localization phase
+- Japanese-capable font aliases are provided in [ja_assets.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ja_assets.h)
+- UI text is centralized in [ui_text.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ui_text.h)
 - A small built-in monochrome icon set is provided in [icons.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/icons.h)
 - No SD-backed emoji or external icon font is required
 - Header right side shows battery level as `BAT xx%`
 - Footer left side shows JST time converted from received MQTT unix time
 - If no valid live time has been received yet, the footer shows `--:--`
+- Japanese text uses a separate drawing path from numeric text
+  - numeric values keep the existing Latin fonts
+  - labels and helper text use Japanese-capable fonts
 
 ## Navigation
 
@@ -194,12 +200,18 @@ Sunrise / sunset are estimated locally from the configured site position:
 - `CONFIG_SITE_LATITUDE`
 - `CONFIG_SITE_LONGITUDE`
 
+Night mode is used only for interpretation.
+
+- `Light` still appears as a sensor value and graph
+- but it is removed from `Rain signs` counting when night conditions are confirmed
+
 ## Required Files
 
 - [M5PaperS3-LuxEnv-Slides.ino](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/M5PaperS3-LuxEnv-Slides.ino)
 - [config.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/config.h)
 - [icons.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/icons.h)
 - [ja_assets.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ja_assets.h)
+- [ui_text.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ui_text.h)
 
 You can copy [config.example.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/config.example.h) to `config.h` and fill in your settings.
 

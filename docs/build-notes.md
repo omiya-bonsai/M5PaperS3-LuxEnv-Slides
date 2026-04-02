@@ -28,6 +28,8 @@ SD.begin(GPIO_NUM_47, SPI, 40000000)
 補足:
 
 - `#include <SD.h>` は `#include <M5Unified.h>` より前に置く
+- 日本語 UI では [ja_assets.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ja_assets.h) の日本語フォント設定を使う
+- 文言切替は [ui_text.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ui_text.h) に集約している
 
 ## 既知のビルドエラー
 
@@ -51,8 +53,12 @@ SD.begin(GPIO_NUM_47, SPI, 40000000)
 
 ### 日本語表示について
 
-コンパイル自体は通っても、実機では日本語が豆腐文字になるケースがある。  
-これはビルドエラーではなく、フォント適用と描画経路の問題として扱う。
+コンパイルが通っても、描画経路が混在していると日本語が欠字化することがある。  
+対策方針:
+
+- 数値・単位・時刻は既存の英数字フォントを維持
+- ラベル・見出し・補助文は日本語描画ヘルパーへ統一
+- 日本語 UI は `CONFIG_UI_LANG = UI_LANG_JA` を前提に実機確認する
 
 ## 補足
 
