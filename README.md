@@ -1,6 +1,6 @@
 # M5PaperS3 Lux / Env Slides
 
-![M5PaperS3 Lux / Env Slides UI](./images/readme-01.png)
+![M5PaperS3 Lux / Env Slides UI](./images/readme-02.png)
 
 [README日本語版](./README.ja.md)
 
