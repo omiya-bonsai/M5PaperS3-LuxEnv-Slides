@@ -1085,8 +1085,8 @@ const char* signalMeaning(const char* label, const String& signal) {
 }
 
 void drawSignalToken(int x, int y, const char* label, const String& signal) {
-  M5.Display.drawString(label, x, y, &fonts::Font2);
-  int iconX = x + 16;
+  drawUiTextLeft(label, x, y, uiSmallFont());
+  int iconX = x + uiTextWidth(label, uiSmallFont()) + 8;
   if (signal == "NIGHT") {
     drawUiTextLeft(ui_text::kNight, iconX, y, uiSmallFont());
     return;
@@ -1102,10 +1102,10 @@ void drawPatternSummaryRow(int x, int y, const char* heading,
   String cluePressure = isClueRow ? String("DOWN") : pSignal;
   String clueHumidity = isClueRow ? String("UP") : hSignal;
   String clueLight = isClueRow ? String("DOWN") : lSignal;
-  drawSignalToken(baseX, y, "P", cluePressure);
-  drawSignalToken(baseX + 66, y, "H", clueHumidity);
+  drawSignalToken(baseX, y, ui_text::kPatternPressure, cluePressure);
+  drawSignalToken(baseX + 94, y, ui_text::kPatternHumidity, clueHumidity);
   if (!isClueRow || lightActive) {
-    drawSignalToken(baseX + 132, y, "L", lightActive ? clueLight : String("NIGHT"));
+    drawSignalToken(baseX + 188, y, ui_text::kPatternLight, lightActive ? clueLight : String("NIGHT"));
   }
 }
 
