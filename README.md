@@ -159,6 +159,7 @@ Important notes are collected here:
 - [Handoff](./docs/handoff.md)
 - [UI plan](./docs/ui-plan.md)
 - [Decision log](./docs/decision-log.md)
+- [Third-party assets](./docs/third-party-assets.md)
 
 ## Current Focus
 

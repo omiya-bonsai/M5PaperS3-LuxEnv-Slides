@@ -154,6 +154,7 @@ SDカードには次を保存します。
 - [引き継ぎ](./docs/handoff.md)
 - [UI計画](./docs/ui-plan.md)
 - [判断記録](./docs/decision-log.md)
+- [第三者素材](./docs/third-party-assets.md)
 
 ## 現在の焦点
 
