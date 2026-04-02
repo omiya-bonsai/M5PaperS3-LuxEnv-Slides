@@ -2,20 +2,27 @@
 
 ## Overview
 
-This sketch runs on **M5PaperS3** and renders a portrait teaching dashboard for reading environmental change.
+This sketch runs on **M5PaperS3** and shows a portrait teaching dashboard for reading environmental change.
 
-It is designed for a learning use case:
+The learning goal is:
 
 - read current outdoor and window-side conditions
 - notice recent changes over time
 - compare pressure, humidity, and light together
 - think about whether rain may be getting closer
 
-The goal is **not** automated forecasting. The goal is to help the reader infer natural changes from sensor data.
+This is **not** an automated forecast app. It is a teaching UI for observing clues and making simple inferences.
+
+## Current UI State
+
+- English UI exists as a stable baseline
+- Japanese UI is now readable on device
+- current work is final Japanese layout polishing
+- slide roles are fixed and no longer changing significantly
 
 ## MQTT Topics
 
-The sketch subscribes to these topics:
+The sketch subscribes to:
 
 - `env4`
 - `home/env/lux/raw`
@@ -28,6 +35,8 @@ Meaning:
 - `home/env/lux/raw`: current lux
 - `home/env/lux/meta`: lux average / delta / rate / trend
 - `home/env/lux/status`: sensor and network health
+
+See also: [docs/spec-topics.md](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/docs/spec-topics.md)
 
 ## Storage
 
@@ -52,90 +61,52 @@ SD access is initialized with explicit SPI settings:
 
 ## Slides
 
-### Slide 1: Current
+### Slide 1: Current / 現在値
 
-Shows the current values in a 2x2 grid:
+Shows:
 
-- temperature
-- humidity
-- pressure
-- lux
+- current values in a 2x2 grid
+- recent changes for pressure / humidity / light
+- rain-sign count
+- current pattern vs rain-pattern reference
 
-The lower block summarizes recent changes across:
+### Slide 2: Signals / 変化のサイン
 
-- pressure
-- humidity
-- light
+Shows:
 
-It also shows:
-
-- number of rain-related signs currently observed
-- a simple `Now` pattern line
-- a simple `Rain pattern` reference line
-- a short explanation line for daytime or night mode
-
-### Slide 2: Signals
-
-Shows the direction of recent change for:
-
-- pressure
-- humidity
-- light
-
-Each row combines:
-
-- label
-- state word
-- small icon / arrow cue
-- centered gauge
-- short meaning hint
-
-The bottom interpretation band shows:
-
+- direction of recent change for pressure / humidity / light
+- a centered gauge for each signal
+- an interpretation card
 - rain-sign count
 - current pattern summary
-- rain-pattern reference
-- a short daytime / night explanation
-- a guiding question
+- a reference rain pattern
+- a short guiding question
 
-### Slide 3: Short-Term
+### Slide 3: Short-Term / 短期傾向
 
-Shows short-term rolling graphs for:
+Shows:
 
-- pressure
-- humidity
-- lux
-
-It also shows:
-
-- graph window start / end time
-- graph midpoint time
+- short-term rolling graphs for pressure / humidity / lux
 - current values summary strip
-- question: `What is changing now?`
+- question: `What is changing now?` / `今、何が変わっている？`
 
-Default target window:
+Target window:
 
 - `15 min`
 
-### Slide 4: Long-Term
+### Slide 4: Long-Term / 長期傾向
 
-Shows long-term rolling graphs for:
+Shows:
 
-- pressure
-- humidity
-- lux
-
-It also shows:
-
-- graph window start / middle / end time
+- long-term rolling graphs for pressure / humidity / lux
 - current values summary strip
-- question: `Is the trend continuing?`
+- question: `Is the trend continuing?` / `流れは続いている？`
 
-Default target window:
+Target window:
 
 - `120 min`
 
-### Status Screen
+### Status Screen / 状態
 
 Status is a separate auxiliary screen, not part of the normal 4-slide loop.
 
@@ -150,20 +121,15 @@ It shows two diagnostic cards:
 - UI language can be switched in `config.h`
   - English
   - Japanese
-- Fonts are limited to:
-  - `fonts::Font2`
-  - `fonts::Font4`
-  - `fonts::Font6`
-- Japanese-capable font aliases are provided in [ja_assets.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ja_assets.h)
 - UI text is centralized in [ui_text.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ui_text.h)
+- Japanese-capable font aliases are provided in [ja_assets.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ja_assets.h)
 - A small built-in monochrome icon set is provided in [icons.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/icons.h)
-- No SD-backed emoji or external icon font is required
+- Numeric text and Japanese text use separate drawing paths
+  - numeric values keep the Latin fonts
+  - labels and helper text use Japanese-capable drawing helpers
 - Header right side shows battery level as `BAT xx%`
 - Footer left side shows JST time converted from received MQTT unix time
 - If no valid live time has been received yet, the footer shows `--:--`
-- Japanese text uses a separate drawing path from numeric text
-  - numeric values keep the existing Latin fonts
-  - labels and helper text use Japanese-capable fonts
 
 ## Navigation
 
@@ -195,15 +161,12 @@ Night mode is enabled only when both are true:
 - local time is after sunset or before sunrise
 - low lux continues for a sustained period
 
-Sunrise / sunset are estimated locally from the configured site position:
+Sunrise / sunset are estimated locally from:
 
 - `CONFIG_SITE_LATITUDE`
 - `CONFIG_SITE_LONGITUDE`
 
-Night mode is used only for interpretation.
-
-- `Light` still appears as a sensor value and graph
-- but it is removed from `Rain signs` counting when night conditions are confirmed
+Night mode affects interpretation only.
 
 ## Required Files
 
@@ -226,15 +189,17 @@ You can copy [config.example.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv
 
 - Board: `M5PaperS3`
 - `#include <SD.h>` must stay before `#include <M5Unified.h>`
-- The sketch is built around recent `M5Unified` / `M5GFX` versions and avoids unsupported fonts such as `Font5`
-- Build target used in this project:
+- unsupported fonts such as `Font5` are avoided
+- build target:
   - `m5stack:esp32:m5stack_papers3`
+
+See also: [docs/build-notes.md](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/docs/build-notes.md)
 
 ## Current Focus
 
-The sender side is already stable enough. The main focus is display quality:
+The main focus is no longer basic functionality. The main focus is:
 
-- readability
+- Japanese UI readability
 - visual hierarchy
 - slide-to-slide teaching flow
 - helping the reader compare multiple clues together

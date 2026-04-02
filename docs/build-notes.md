@@ -30,6 +30,7 @@ SD.begin(GPIO_NUM_47, SPI, 40000000)
 - `#include <SD.h>` は `#include <M5Unified.h>` より前に置く
 - 日本語 UI では [ja_assets.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ja_assets.h) の日本語フォント設定を使う
 - 文言切替は [ui_text.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ui_text.h) に集約している
+- `config.h` の `CONFIG_UI_LANG` で英語 / 日本語を切り替える
 
 ## 既知のビルドエラー
 
@@ -53,12 +54,12 @@ SD.begin(GPIO_NUM_47, SPI, 40000000)
 
 ### 日本語表示について
 
-コンパイルが通っても、描画経路が混在していると日本語が欠字化することがある。  
-対策方針:
+日本語表示は実機で成立している。  
+現在の方針:
 
 - 数値・単位・時刻は既存の英数字フォントを維持
-- ラベル・見出し・補助文は日本語描画ヘルパーへ統一
-- 日本語 UI は `CONFIG_UI_LANG = UI_LANG_JA` を前提に実機確認する
+- ラベル・見出し・補助文は日本語描画ヘルパーを使う
+- 今後の主課題はフォント不具合ではなく、日本語レイアウトの最終調整
 
 ## 補足
 

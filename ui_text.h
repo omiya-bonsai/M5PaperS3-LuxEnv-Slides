@@ -146,10 +146,10 @@ static constexpr const char* kWatch = "ようすを見る";
 // Teaching text
 static constexpr const char* kRainSignsFmt = "雨の手がかり: %d / %d";
 static constexpr const char* kNow = "今:";
-static constexpr const char* kRainPattern = "雨が近い形:";
+static constexpr const char* kRainPattern = "雨が近い並び:";
 static constexpr const char* kDayRule = "気圧↓  湿度↑  明るさ↓（昼）";
-static constexpr const char* kNightRule = "夜は気圧と湿度で見る。";
-static constexpr const char* kCheckOrder = "見る順番: 気圧 → 湿度 → 明るさ";
+static constexpr const char* kNightRule = "夜は気圧と湿度を見る。";
+static constexpr const char* kCheckOrder = "見る順番: 気圧→湿度→明るさ";
 static constexpr const char* kWhatChangedFirst = "何が先に変わった？";
 static constexpr const char* kRainComing = "雨が近い？";
 static constexpr const char* kNowPromptFmt = "今  %s";
