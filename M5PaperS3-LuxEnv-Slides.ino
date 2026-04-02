@@ -810,8 +810,10 @@ void drawFooterDynamic() {
   M5.Display.fillRect(btnX + 1, btnY + 1, FOOTER_BUTTON_W - 2, FOOTER_BUTTON_H - 2, TFT_WHITE);
   M5.Display.fillRect(btnX + FOOTER_BUTTON_W + 8, M5.Display.height() - UI_FOOTER_H + 1,
                       M5.Display.width() - (btnX + FOOTER_BUTTON_W + 8), UI_FOOTER_H - 2, TFT_WHITE);
+  M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
   M5.Display.drawString(ts, UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
   drawUiTextCenter(btnLabel, btnX + FOOTER_BUTTON_W / 2, btnY + 4, uiSmallFont());
+  M5.Display.drawRect(btnX, btnY, FOOTER_BUTTON_W, FOOTER_BUTTON_H, TFT_BLACK);
   M5.Display.drawRightString(net + "  " + mq, M5.Display.width() - UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
 }
 
@@ -933,8 +935,13 @@ void drawMetricWithIcon(const MonoIcon& icon, const char* label, const String& v
                         int x, int y, int unitX) {
   drawMonoIcon(x, y + 2, icon, 1);
   drawUiTextLeft(label, x + icon.width + 10, y + 8, uiSmallFont());
+  // Clear the value/unit area so shorter updates do not leave stale glyphs on E-Ink.
+  M5.Display.fillRect(x, y + icon.height + 8, 220, 54, TFT_WHITE);
   M5.Display.drawString(value, x, y + icon.height + 14, &fonts::Font6);
   if (unit.length() > 0) {
+    // Clear the unit area separately to avoid residual glyphs between the value and unit.
+    M5.Display.fillRect(unitX - 10, y + icon.height + 30, 72, 24, TFT_WHITE);
+    M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
     M5.Display.drawString(unit, unitX, y + icon.height + 36, &fonts::Font2);
   }
 }
@@ -1163,12 +1170,15 @@ void drawPatternSummaryRow(int x, int y, const char* heading,
 
 void drawChangeSummaryRow(const MonoIcon& icon, const char* label, const String& signal, int y) {
   const MonoIcon& stateIcon = signalIcon(signal);
-  const int stateIconX = UI_MARGIN_X + 360;
+  const int signalTextX = UI_MARGIN_X + 252;
+  const int stateIconX = signalTextX - stateIcon.width - 16;
+  const int meaningX = UI_MARGIN_X + 336;
   drawMonoIcon(UI_MARGIN_X + 22, y + 2, icon, 1);
   drawUiTextLeft(label, UI_MARGIN_X + 22 + icon.width + 10, y + 8, uiSmallFont());
-  drawUiTextLeft(signalGlyph(signal), UI_MARGIN_X + 220, y, uiBodyFont());
   drawMonoIcon(stateIconX, y - 6, stateIcon, 1);
-  drawUiTextRight(signalMeaning(label, signal), stateIconX - 14, y + 8, uiSmallFont());
+  drawUiTextLeft(signalGlyph(signal), signalTextX, y, uiBodyFont());
+  M5.Display.fillRect(meaningX - 4, y + 2, M5.Display.width() - meaningX - UI_MARGIN_X, 28, TFT_WHITE);
+  drawUiTextLeft(signalMeaning(label, signal), meaningX, y + 8, uiSmallFont());
 }
 
 float clamp01(float v) {
@@ -1348,10 +1358,6 @@ void drawSlideSummaryBody() {
                   (isRainSign(ui_text::kHumidity, hArrow) ? 1 : 0) +
                   ((lightActive && isRainSign(ui_text::kLight, lArrow)) ? 1 : 0);
   String luxValue = formatFloat1(g_luxRaw.lux);
-  if (!lightActive && g_luxRaw.valid) {
-    luxValue += "  ";
-    luxValue += ui_text::kNight;
-  }
 
   drawCard(UI_MARGIN_X, currentY, cardW, currentH, ui_text::kCurrentValues);
   drawMetricWithIcon(ICON_TEMP, ui_text::kTemp, formatFloat1(g_env4.temperature), "C", innerX, 126, leftUnitX);

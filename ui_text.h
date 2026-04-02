@@ -154,13 +154,13 @@ static constexpr const char* kRainSignsFmt = "雨の手がかり: %d / %d";
 static constexpr const char* kNow = "今:";
 static constexpr const char* kRainPattern = "雨が近い並び:";
 static constexpr const char* kDayRule = "気圧↓ 湿度↑ 明るさ↓（昼の場合）";
-static constexpr const char* kNightRule = "夜は気圧と湿度を見る。";
+static constexpr const char* kNightRule = "夜間は気圧と湿度だけの傾向を見てみよう";
 static constexpr const char* kCheckOrder = "見る順番: 気圧→湿度→明るさ";
 static constexpr const char* kWhatChangedFirst = "気圧、湿度、明るさのうち、どれが先に変わった？";
 static constexpr const char* kRainComing = "もうすぐ雨が降るかな？";
 static constexpr const char* kNowPromptFmt = "%s";
 static constexpr const char* kWindowFmt = "期間 %s - %s  (%lu分 / 目標%lu分)";
-static constexpr const char* kShortPrompt = "今、何が変わっている？";
+static constexpr const char* kShortPrompt = "今、何が大きく変化しているかな？";
 static constexpr const char* kLongPrompt = "今までの流れは続いている？";
 
 // Warning
