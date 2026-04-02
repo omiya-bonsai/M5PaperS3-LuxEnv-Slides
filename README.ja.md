@@ -4,7 +4,7 @@
 
 [English README](./README.md)
 
-[統合ハブ](../../projects/m5papers3-weather-learning-system/README.ja.md)
+[統合ハブ](https://github.com/omiya-bonsai/m5papers3-weather-learning-system)
 
 ## 概要
 
