@@ -1274,9 +1274,9 @@ void drawSlideSummary() {
   drawHeader(ui_text::kSlide1Title);
   const int cardW = M5.Display.width() - UI_MARGIN_X * 2;
   const int currentY = 92;
-  const int currentH = 286;
-  const int changeY = 416;
-  const int changeH = 476;
+  const int currentH = 278;
+  const int changeY = 404;
+  const int changeH = 488;
   const int innerX = UI_MARGIN_X + 20;
   const int innerW = cardW - 40;
   const int colGap = 34;
@@ -1307,17 +1307,17 @@ void drawSlideSummary() {
   drawMetricWithIcon(ICON_PRESSURE, ui_text::kPres, formatFloat1(g_env4.pressure), "hPa", rightColX, 248, rightUnitX);
 
   drawCard(UI_MARGIN_X, changeY, cardW, changeH, ui_text::kRecentChanges);
-  drawChangeSummaryRow(ICON_PRESSURE, ui_text::kPressure, pArrow, 462);
-  drawChangeSummaryRow(ICON_HUMIDITY, ui_text::kHumidity, hArrow, 518);
-  drawChangeSummaryRow(ICON_LIGHT, ui_text::kLight, lightDisplay, 574);
-  M5.Display.drawLine(innerX, 628, UI_MARGIN_X + cardW - 20, 628, TFT_BLACK);
+  drawChangeSummaryRow(ICON_PRESSURE, ui_text::kPressure, pArrow, 450);
+  drawChangeSummaryRow(ICON_HUMIDITY, ui_text::kHumidity, hArrow, 504);
+  drawChangeSummaryRow(ICON_LIGHT, ui_text::kLight, lightDisplay, 558);
+  M5.Display.drawLine(innerX, 610, UI_MARGIN_X + cardW - 20, 610, TFT_BLACK);
   char rainSignsBuf[32];
   snprintf(rainSignsBuf, sizeof(rainSignsBuf), ui_text::kRainSignsFmt, rainSigns, rainDenom);
-  drawUiTextLeft(rainSignsBuf, innerX, 652, uiBodyFont());
-  drawPatternSummaryRow(innerX, 686, ui_text::kNow, pArrow, hArrow, lArrow, lightActive, false);
-  drawPatternSummaryRow(innerX, 720, ui_text::kRainPattern, pArrow, hArrow, lArrow, lightActive, true);
+  drawUiTextLeft(rainSignsBuf, innerX, 634, uiBodyFont());
+  drawPatternSummaryRow(innerX, 668, ui_text::kNow, pArrow, hArrow, lArrow, lightActive, false);
+  drawPatternSummaryRow(innerX, 704, ui_text::kRainPattern, pArrow, hArrow, lArrow, lightActive, true);
   drawUiTextLeft(lightActive ? ui_text::kDayRule : ui_text::kNightRule,
-                 innerX + 76, 762, uiSmallFont());
+                 innerX + 76, 748, uiSmallFont());
 
   drawFooter();
 }
@@ -1335,21 +1335,21 @@ void drawSlideSignals() {
                   (isRainSign(ui_text::kHumidity, hArrow) ? 1 : 0) +
                   ((lightActive && isRainSign(ui_text::kLight, lArrow)) ? 1 : 0);
 
-  drawSignalRow(ICON_PRESSURE, ui_text::kPressure, pArrow, normalizedPressureTrend(), 92);
-  drawSignalRow(ICON_HUMIDITY, ui_text::kHumidity, hArrow, normalizedHumidityTrend(), 262);
-  drawSignalRow(ICON_LIGHT, ui_text::kLight, lightDisplay, lightActive ? normalizedLuxTrend() : 0.0f, 432);
+  drawSignalRow(ICON_PRESSURE, ui_text::kPressure, pArrow, normalizedPressureTrend(), 88);
+  drawSignalRow(ICON_HUMIDITY, ui_text::kHumidity, hArrow, normalizedHumidityTrend(), 242);
+  drawSignalRow(ICON_LIGHT, ui_text::kLight, lightDisplay, lightActive ? normalizedLuxTrend() : 0.0f, 396);
 
-  drawCard(UI_MARGIN_X, 576, M5.Display.width() - UI_MARGIN_X * 2, 244, ui_text::kInterpret);
-  drawUiTextLeft(ui_text::kCheckOrder, UI_MARGIN_X + 18, 608, uiSmallFont());
+  drawCard(UI_MARGIN_X, 544, M5.Display.width() - UI_MARGIN_X * 2, 278, ui_text::kInterpret);
+  drawUiTextLeft(ui_text::kCheckOrder, UI_MARGIN_X + 18, 574, uiSmallFont());
   char rainSignsBuf[32];
   snprintf(rainSignsBuf, sizeof(rainSignsBuf), ui_text::kRainSignsFmt, rainSigns, rainDenom);
-  drawUiTextLeft(rainSignsBuf, UI_MARGIN_X + 18, 640, uiBodyFont());
-  drawPatternSummaryRow(UI_MARGIN_X + 18, 676, ui_text::kNow, pArrow, hArrow, lArrow, lightActive, false);
-  drawPatternSummaryRow(UI_MARGIN_X + 18, 712, ui_text::kRainPattern, pArrow, hArrow, lArrow, lightActive, true);
+  drawUiTextLeft(rainSignsBuf, UI_MARGIN_X + 18, 608, uiBodyFont());
+  drawPatternSummaryRow(UI_MARGIN_X + 18, 644, ui_text::kNow, pArrow, hArrow, lArrow, lightActive, false);
+  drawPatternSummaryRow(UI_MARGIN_X + 18, 680, ui_text::kRainPattern, pArrow, hArrow, lArrow, lightActive, true);
   drawUiTextLeft(lightActive ? ui_text::kDayRule : ui_text::kNightRule,
-                 UI_MARGIN_X + 76, 748, uiSmallFont());
-  drawUiTextLeft(ui_text::kWhatChangedFirst, UI_MARGIN_X + 18, 786, uiSmallFont());
-  drawUiTextRight(ui_text::kRainComing, M5.Display.width() - UI_MARGIN_X - 34, 786, uiSmallFont());
+                 UI_MARGIN_X + 76, 724, uiSmallFont());
+  drawUiTextLeft(ui_text::kWhatChangedFirst, UI_MARGIN_X + 18, 774, uiSmallFont());
+  drawUiTextRight(ui_text::kRainComing, M5.Display.width() - UI_MARGIN_X - 34, 774, uiSmallFont());
 
   drawFooter();
 }
