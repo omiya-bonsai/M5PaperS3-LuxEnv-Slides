@@ -1,5 +1,7 @@
 # M5PaperS3 Lux / Env Slides
 
+![M5PaperS3 Lux / Env Slides UI](./images/readme-01.png)
+
 [English README](./README.md)
 
 ## 概要
