@@ -174,3 +174,8 @@ Current state:
 - 32px icons and slide-transition stability fixes are already reflected
 - redraw work for same-slide updates has been reduced by reusing header/footer framing
 - the main remaining work is layout refinement and additional redraw optimization inside slide bodies
+
+## License
+
+- Project license: [MIT](./LICENSE)
+- Third-party icon assets: [docs/third-party-assets.md](./docs/third-party-assets.md)
