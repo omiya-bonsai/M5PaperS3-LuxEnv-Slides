@@ -59,6 +59,8 @@ Behavior:
 
 ## Slides
 
+![Slides overview](./docs/images/readme-02.png)
+
 ### Slide 1: Current
 
 Shows:
