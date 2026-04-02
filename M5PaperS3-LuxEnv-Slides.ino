@@ -1269,7 +1269,7 @@ size_t sampledIndex(size_t outIdx, size_t sourceCount, size_t targetCount) {
 void drawSimpleLineGraphFloat(int x, int y, int w, int h, const MonoIcon& icon,
                               const float* vals, size_t n, const char* title, const char* unit,
                               const String& startLabel, const String& midLabel, const String& endLabel,
-                              size_t maxRenderPoints, bool drawAllMarkers) {
+                              size_t maxRenderPoints, bool drawAllMarkers, bool clampMinToZero = false) {
   M5.Display.drawRect(x, y, w, h, TFT_BLACK);
   drawMonoIcon(x + 6, y + 4, icon, 1);
   drawUiTextLeft(title, x + icon.width + 14, y + 10, uiSmallFont());
@@ -1286,9 +1286,17 @@ void drawSimpleLineGraphFloat(int x, int y, int w, int h, const MonoIcon& icon,
     if (vals[i] < vMin) vMin = vals[i];
     if (vals[i] > vMax) vMax = vals[i];
   }
+  if (clampMinToZero && vMin > 0.0f) {
+    vMin = 0.0f;
+  }
   if (fabs(vMax - vMin) < 0.001f) {
-    vMin -= 1.0f;
-    vMax += 1.0f;
+    if (clampMinToZero) {
+      vMin = 0.0f;
+      vMax += 1.0f;
+    } else {
+      vMin -= 1.0f;
+      vMax += 1.0f;
+    }
   }
 
   char bufMin[32], bufMax[32];
@@ -1304,7 +1312,8 @@ void drawSimpleLineGraphFloat(int x, int y, int w, int h, const MonoIcon& icon,
   int gx = x + 10;
   int gy = y + 24;
   int gw = w - 20;
-  int gh = h - 36;
+  int graphBottomPad = clampMinToZero ? 10 : 0;
+  int gh = h - 36 - graphBottomPad;
   size_t renderN = n;
   if (maxRenderPoints >= 2 && renderN > maxRenderPoints) {
     renderN = maxRenderPoints;
@@ -1438,7 +1447,7 @@ void drawTrendGraphsBody(uint32_t targetWindowMin, const char* prompt) {
                            startLabel, midLabel, endLabel, maxRenderPoints, drawAllMarkers);
   drawSimpleLineGraphFloat(UI_MARGIN_X, 512, M5.Display.width() - UI_MARGIN_X * 2, 188,
                            ICON_LIGHT, g_luxGraphVals, luxN, ui_text::kLux, "",
-                           startLabel, midLabel, endLabel, maxRenderPoints, drawAllMarkers);
+                           startLabel, midLabel, endLabel, maxRenderPoints, drawAllMarkers, true);
 
   M5.Display.drawLine(UI_MARGIN_X, 726, M5.Display.width() - UI_MARGIN_X, 726, TFT_BLACK);
   char nowBuf[64];

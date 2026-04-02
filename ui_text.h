@@ -161,7 +161,7 @@ static constexpr const char* kRainComing = "もうすぐ雨が降るかな？";
 static constexpr const char* kNowPromptFmt = "%s";
 static constexpr const char* kWindowFmt = "期間 %s - %s  (%lu分 / 目標%lu分)";
 static constexpr const char* kShortPrompt = "今、何が大きく変化しているかな？";
-static constexpr const char* kLongPrompt = "今までの流れは続いている？";
+static constexpr const char* kLongPrompt = "グラフからどのような傾向が読み取れる？";
 
 // Warning
 static constexpr const char* kWarningSensorMqtt = "警告: センサー / MQTT異常";
