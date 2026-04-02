@@ -7,6 +7,8 @@
 
 #include "config.h"
 #include "icons.h"
+#include "ja_assets.h"
+#include "ui_text.h"
 
 // ============================================================
 // M5PaperS3 MQTT Slide Dashboard
@@ -250,9 +252,9 @@ String formatFooterTime() {
 String formatBatteryStatus() {
   int batt = M5.Power.getBatteryLevel();
   if (batt < 0 || batt > 100) {
-    return "BAT --%";
+    return ui_text::kBatteryUnknown;
   }
-  String label = String("BAT ") + String(batt) + "%";
+  String label = String(ui_text::kBatteryPrefix) + String(batt) + "%";
   if (M5.Power.isCharging()) {
     label += "+";
   }
@@ -688,6 +690,87 @@ static constexpr int STATUS_SWIPE_START_Y = 760;
 static constexpr int STATUS_SWIPE_MIN_DISTANCE = 120;
 static constexpr int STATUS_SWIPE_MAX_SIDE_SHIFT = 80;
 
+inline bool isJapaneseUi() {
+  return CONFIG_UI_LANG == UI_LANG_JA;
+}
+
+inline const lgfx::IFont* uiSmallFont() {
+  return isJapaneseUi() ? ja_assets::kLabelFont : &fonts::Font2;
+}
+
+inline const lgfx::IFont* uiBodyFont() {
+  return isJapaneseUi() ? ja_assets::kBodyFont : &fonts::Font4;
+}
+
+inline const lgfx::IFont* uiTitleFont() {
+  return isJapaneseUi() ? ja_assets::kTitleFont : &fonts::Font4;
+}
+
+M5Canvas gUiTextCanvas(&M5.Display);
+
+int uiTextWidth(const char* text, const lgfx::IFont* font) {
+  if (!text) return 0;
+  if (!isJapaneseUi()) {
+    return M5.Display.textWidth(text, font);
+  }
+  M5.Display.setFont(font);
+  return M5.Display.textWidth(text);
+}
+
+int uiTextWidth(const String& text, const lgfx::IFont* font) {
+  return uiTextWidth(text.c_str(), font);
+}
+
+void drawUiTextLeft(const char* text, int x, int y, const lgfx::IFont* font,
+                    uint16_t fg = TFT_BLACK, uint16_t bg = TFT_WHITE) {
+  M5.Display.setTextColor(fg, bg);
+  if (!isJapaneseUi()) {
+    M5.Display.drawString(text, x, y, font);
+    return;
+  }
+  int width = uiTextWidth(text, font);
+  int height = M5.Display.fontHeight(font);
+  if (width <= 0) return;
+
+  gUiTextCanvas.deleteSprite();
+  gUiTextCanvas.setColorDepth(1);
+  gUiTextCanvas.setFont(font);
+  gUiTextCanvas.setTextWrap(false);
+  gUiTextCanvas.createSprite(width + 8, height + 8);
+  gUiTextCanvas.fillSprite(bg);
+  gUiTextCanvas.setTextColor(fg, bg);
+  gUiTextCanvas.setCursor(0, 0);
+  gUiTextCanvas.print(text);
+  gUiTextCanvas.pushSprite(&M5.Display, x, y);
+}
+
+void drawUiTextLeft(const String& text, int x, int y, const lgfx::IFont* font,
+                    uint16_t fg = TFT_BLACK, uint16_t bg = TFT_WHITE) {
+  drawUiTextLeft(text.c_str(), x, y, font, fg, bg);
+}
+
+void drawUiTextRight(const char* text, int rightX, int y, const lgfx::IFont* font,
+                     uint16_t fg = TFT_BLACK, uint16_t bg = TFT_WHITE) {
+  int width = uiTextWidth(text, font);
+  drawUiTextLeft(text, rightX - width, y, font, fg, bg);
+}
+
+void drawUiTextRight(const String& text, int rightX, int y, const lgfx::IFont* font,
+                     uint16_t fg = TFT_BLACK, uint16_t bg = TFT_WHITE) {
+  drawUiTextRight(text.c_str(), rightX, y, font, fg, bg);
+}
+
+void drawUiTextCenter(const char* text, int centerX, int y, const lgfx::IFont* font,
+                      uint16_t fg = TFT_BLACK, uint16_t bg = TFT_WHITE) {
+  int width = uiTextWidth(text, font);
+  drawUiTextLeft(text, centerX - width / 2, y, font, fg, bg);
+}
+
+void drawUiTextCenter(const String& text, int centerX, int y, const lgfx::IFont* font,
+                      uint16_t fg = TFT_BLACK, uint16_t bg = TFT_WHITE) {
+  drawUiTextCenter(text.c_str(), centerX, y, font, fg, bg);
+}
+
 void drawHeader(const char* title) {
   M5.Display.fillScreen(TFT_WHITE);
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
@@ -695,9 +778,8 @@ void drawHeader(const char* title) {
   M5.Display.setTextSize(1);
 
   M5.Display.fillRect(0, 0, M5.Display.width(), UI_HEADER_H - 8, TFT_BLACK);
-  M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
-  M5.Display.drawString(title, 16, 14, &fonts::Font4);
-  M5.Display.drawRightString(formatBatteryStatus(), M5.Display.width() - 16, 16, &fonts::Font2);
+  drawUiTextLeft(title, 16, 14, uiTitleFont(), TFT_WHITE, TFT_BLACK);
+  drawUiTextRight(formatBatteryStatus(), M5.Display.width() - 16, 16, uiSmallFont(), TFT_WHITE, TFT_BLACK);
 
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
   M5.Display.drawLine(0, UI_HEADER_H, M5.Display.width(), UI_HEADER_H, TFT_BLACK);
@@ -705,16 +787,16 @@ void drawHeader(const char* title) {
 
 void drawFooter() {
   String ts = formatFooterTime();
-  String net = (WiFi.status() == WL_CONNECTED) ? "WIFI OK" : "WIFI NG";
-  String mq = mqttClient.connected() ? "MQTT OK" : "MQTT NG";
+  String net = (WiFi.status() == WL_CONNECTED) ? ui_text::kWifiOk : ui_text::kWifiNg;
+  String mq = mqttClient.connected() ? ui_text::kMqttOk : ui_text::kMqttNg;
   const int btnX = (M5.Display.width() - FOOTER_BUTTON_W) / 2;
   const int btnY = M5.Display.height() - UI_FOOTER_H + 6;
-  const char* btnLabel = (g_currentSlide == STATUS_SCREEN_INDEX) ? "BACK" : "STATUS";
+  const char* btnLabel = (g_currentSlide == STATUS_SCREEN_INDEX) ? ui_text::kBackButton : ui_text::kStatusButton;
 
   M5.Display.drawLine(0, M5.Display.height() - UI_FOOTER_H, M5.Display.width(), M5.Display.height() - UI_FOOTER_H, TFT_BLACK);
   M5.Display.drawString(ts, UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
+  drawUiTextCenter(btnLabel, btnX + FOOTER_BUTTON_W / 2, btnY + 4, uiSmallFont());
   M5.Display.drawRect(btnX, btnY, FOOTER_BUTTON_W, FOOTER_BUTTON_H, TFT_BLACK);
-  M5.Display.drawCentreString(btnLabel, btnX + FOOTER_BUTTON_W / 2, btnY + 4, &fonts::Font2);
   M5.Display.drawRightString(net + "  " + mq, M5.Display.width() - UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
 }
 
@@ -736,13 +818,13 @@ bool isStatusSwipe(const m5::touch_detail_t& touch) {
 
 void drawKeyValue(const char* label, const String& value, int x, int y, const lgfx::IFont* valueFont = &fonts::Font4) {
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
-  M5.Display.drawString(label, x, y, &fonts::Font2);
+  drawUiTextLeft(label, x, y, uiSmallFont());
   M5.Display.drawString(value, x, y + 18, valueFont);
 }
 
 void drawMetricBlock(const char* label, const String& value, const String& unit, int x, int y, int unitDx = 110) {
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
-  M5.Display.drawString(label, x, y, &fonts::Font2);
+  drawUiTextLeft(label, x, y, uiSmallFont());
   M5.Display.drawString(value, x, y + 16, &fonts::Font6);
   if (unit.length() > 0) {
     M5.Display.drawString(unit, x + unitDx, y + 34, &fonts::Font2);
@@ -751,27 +833,31 @@ void drawMetricBlock(const char* label, const String& value, const String& unit,
 
 void drawTextBlock(const char* label, const String& value, int x, int y, const lgfx::IFont* valueFont = &fonts::Font4) {
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
-  M5.Display.drawString(label, x, y, &fonts::Font2);
+  drawUiTextLeft(label, x, y, uiSmallFont());
   M5.Display.drawString(value, x, y + 16, valueFont);
 }
 
 void drawTextPair(const char* label, const String& value, int x, int y, int valueX, const lgfx::IFont* valueFont = &fonts::Font4) {
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
-  M5.Display.drawString(label, x, y, &fonts::Font2);
+  drawUiTextLeft(label, x, y, uiSmallFont());
   M5.Display.drawString(value, valueX, y, valueFont);
 }
 
 void drawTextRowAligned(const char* label, const String& value, int labelX, int valueRightX, int y,
                         const lgfx::IFont* valueFont = &fonts::Font4) {
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
-  M5.Display.drawString(label, labelX, y, &fonts::Font2);
-  M5.Display.drawRightString(value, valueRightX, y, valueFont);
+  drawUiTextLeft(label, labelX, y, uiSmallFont());
+  if (isJapaneseUi()) {
+    drawUiTextRight(value, valueRightX, y, valueFont);
+  } else {
+    M5.Display.drawRightString(value, valueRightX, y, valueFont);
+  }
 }
 
 void drawSummaryRow(const char* label, const String& value, int x, int y) {
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
-  M5.Display.drawString(label, x, y, &fonts::Font2);
-  M5.Display.drawRightString(value, M5.Display.width() - UI_MARGIN_X - 8, y, &fonts::Font4);
+  drawUiTextLeft(label, x, y, uiSmallFont());
+  drawUiTextRight(value, M5.Display.width() - UI_MARGIN_X - 8, y, uiBodyFont());
 }
 
 void drawMonoIcon(int x, int y, const MonoIcon& icon, int scale = 1) {
@@ -788,13 +874,13 @@ void drawMonoIcon(int x, int y, const MonoIcon& icon, int scale = 1) {
 
 void drawLabeledIcon(const MonoIcon& icon, const char* label, int x, int y, int scale = 1) {
   drawMonoIcon(x, y, icon, scale);
-  M5.Display.drawString(label, x + icon.width * scale + 8, y + 2, &fonts::Font2);
+  drawUiTextLeft(label, x + icon.width * scale + 8, y + 2, uiSmallFont());
 }
 
 void drawMetricWithIcon(const MonoIcon& icon, const char* label, const String& value, const String& unit,
                         int x, int y, int unitX) {
   drawMonoIcon(x, y + 2, icon, 1);
-  M5.Display.drawString(label, x + 24, y + 2, &fonts::Font2);
+  drawUiTextLeft(label, x + 24, y + 2, uiSmallFont());
   M5.Display.drawString(value, x, y + 28, &fonts::Font6);
   if (unit.length() > 0) {
     M5.Display.drawString(unit, unitX, y + 50, &fonts::Font2);
@@ -803,14 +889,14 @@ void drawMetricWithIcon(const MonoIcon& icon, const char* label, const String& v
 
 void drawSummaryIconRow(const MonoIcon& icon, const char* label, const String& value, int x, int y) {
   drawMonoIcon(x, y - 2, icon, 1);
-  M5.Display.drawString(label, x + 24, y, &fonts::Font2);
-  M5.Display.drawRightString(value, M5.Display.width() - UI_MARGIN_X - 8, y, &fonts::Font4);
+  drawUiTextLeft(label, x + 24, y, uiSmallFont());
+  drawUiTextRight(value, M5.Display.width() - UI_MARGIN_X - 8, y, uiBodyFont());
 }
 
 void drawSummaryMetric(const char* label, const String& value, const String& unit,
                        int x, int y, int valueW, int unitGap = 10) {
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
-  M5.Display.drawString(label, x, y, &fonts::Font2);
+  drawUiTextLeft(label, x, y, uiSmallFont());
   M5.Display.drawString(value, x, y + 18, &fonts::Font6);
   if (unit.length() > 0) {
     M5.Display.drawString(unit, x + valueW + unitGap, y + 40, &fonts::Font2);
@@ -949,22 +1035,22 @@ size_t collectLuxWindow(float* luxVals, uint32_t* tsVals, uint32_t windowMin) {
 
 void drawCard(int x, int y, int w, int h, const char* title) {
   M5.Display.drawRect(x, y, w, h, TFT_BLACK);
-  M5.Display.drawString(title, x + 10, y + 10, &fonts::Font2);
+  drawUiTextLeft(title, x + 10, y + 10, uiSmallFont());
 }
 
 const char* trendLabel(const char* trend) {
-  if (strcmp(trend, "rising_fast") == 0) return "RISING FAST";
-  if (strcmp(trend, "rising") == 0) return "RISING";
-  if (strcmp(trend, "falling_fast") == 0) return "FALLING FAST";
-  if (strcmp(trend, "falling") == 0) return "FALLING";
-  return "STABLE";
+  if (strcmp(trend, "rising_fast") == 0) return ui_text::kRisingFast;
+  if (strcmp(trend, "rising") == 0) return ui_text::kRising;
+  if (strcmp(trend, "falling_fast") == 0) return ui_text::kFallingFast;
+  if (strcmp(trend, "falling") == 0) return ui_text::kFalling;
+  return ui_text::kStable;
 }
 
 const char* signalGlyph(const String& signal) {
-  if (signal == "NIGHT") return "NIGHT";
-  if (signal == "UP") return "ASCEND";
-  if (signal == "DOWN") return "DESCEND";
-  return "STEADY";
+  if (signal == "NIGHT") return ui_text::kNight;
+  if (signal == "UP") return ui_text::kAscend;
+  if (signal == "DOWN") return ui_text::kDescend;
+  return ui_text::kSteady;
 }
 
 const MonoIcon& signalIcon(const String& signal) {
@@ -975,34 +1061,34 @@ const MonoIcon& signalIcon(const String& signal) {
 }
 
 bool isRainSign(const char* label, const String& signal) {
-  if (strcmp(label, "PRESSURE") == 0) return signal == "DOWN";
-  if (strcmp(label, "HUMIDITY") == 0) return signal == "UP";
-  if (strcmp(label, "LIGHT") == 0) return signal == "DOWN";
+  if (strcmp(label, ui_text::kPressure) == 0) return signal == "DOWN";
+  if (strcmp(label, ui_text::kHumidity) == 0) return signal == "UP";
+  if (strcmp(label, ui_text::kLight) == 0) return signal == "DOWN";
   return false;
 }
 
 const char* signalMeaning(const char* label, const String& signal) {
-  if (strcmp(label, "PRESSURE") == 0) {
-    if (signal == "DOWN") return "rain sign";
-    if (signal == "UP") return "fair sign";
-    return "watch";
+  if (strcmp(label, ui_text::kPressure) == 0) {
+    if (signal == "DOWN") return ui_text::kRainSign;
+    if (signal == "UP") return ui_text::kFairSign;
+    return ui_text::kWatch;
   }
-  if (strcmp(label, "HUMIDITY") == 0) {
-    if (signal == "UP") return "rain sign";
-    if (signal == "DOWN") return "dry sign";
-    return "watch";
+  if (strcmp(label, ui_text::kHumidity) == 0) {
+    if (signal == "UP") return ui_text::kRainSign;
+    if (signal == "DOWN") return ui_text::kDrySign;
+    return ui_text::kWatch;
   }
-  if (signal == "NIGHT") return "night skip";
-  if (signal == "DOWN") return "cloud sign";
-  if (signal == "UP") return "bright sign";
-  return "watch";
+  if (signal == "NIGHT") return ui_text::kNightSkip;
+  if (signal == "DOWN") return ui_text::kCloudSign;
+  if (signal == "UP") return ui_text::kBrightSign;
+  return ui_text::kWatch;
 }
 
 void drawSignalToken(int x, int y, const char* label, const String& signal) {
-  M5.Display.drawString(label, x, y, &fonts::Font2);
-  int iconX = x + 16;
+  drawUiTextLeft(label, x, y, uiSmallFont());
+  int iconX = x + uiTextWidth(label, uiSmallFont()) + 8;
   if (signal == "NIGHT") {
-    M5.Display.drawString("night", iconX, y, &fonts::Font2);
+    drawUiTextLeft(ui_text::kNight, iconX, y, uiSmallFont());
     return;
   }
   drawMonoIcon(iconX, y - 2, signalIcon(signal), 1);
@@ -1010,25 +1096,25 @@ void drawSignalToken(int x, int y, const char* label, const String& signal) {
 
 void drawPatternSummaryRow(int x, int y, const char* heading,
                            const String& pSignal, const String& hSignal, const String& lSignal,
-                           bool lightActive, bool isClueRow) {
-  M5.Display.drawString(heading, x, y, &fonts::Font2);
+  bool lightActive, bool isClueRow) {
+  drawUiTextLeft(heading, x, y, uiSmallFont());
   int baseX = x + 86;
   String cluePressure = isClueRow ? String("DOWN") : pSignal;
   String clueHumidity = isClueRow ? String("UP") : hSignal;
   String clueLight = isClueRow ? String("DOWN") : lSignal;
-  drawSignalToken(baseX, y, "P", cluePressure);
-  drawSignalToken(baseX + 66, y, "H", clueHumidity);
+  drawSignalToken(baseX, y, ui_text::kPatternPressure, cluePressure);
+  drawSignalToken(baseX + 94, y, ui_text::kPatternHumidity, clueHumidity);
   if (!isClueRow || lightActive) {
-    drawSignalToken(baseX + 132, y, "L", lightActive ? clueLight : String("NIGHT"));
+    drawSignalToken(baseX + 188, y, ui_text::kPatternLight, lightActive ? clueLight : String("NIGHT"));
   }
 }
 
 void drawChangeSummaryRow(const MonoIcon& icon, const char* label, const String& signal, int y) {
   drawMonoIcon(UI_MARGIN_X + 22, y + 2, icon, 1);
-  M5.Display.drawString(label, UI_MARGIN_X + 46, y, &fonts::Font2);
-  M5.Display.drawString(signalGlyph(signal), UI_MARGIN_X + 220, y, &fonts::Font4);
+  drawUiTextLeft(label, UI_MARGIN_X + 46, y, uiSmallFont());
+  drawUiTextLeft(signalGlyph(signal), UI_MARGIN_X + 220, y, uiBodyFont());
   drawMonoIcon(UI_MARGIN_X + 370, y - 2, signalIcon(signal), 1);
-  M5.Display.drawRightString(signalMeaning(label, signal), M5.Display.width() - UI_MARGIN_X - 20, y, &fonts::Font2);
+  drawUiTextRight(signalMeaning(label, signal), M5.Display.width() - UI_MARGIN_X - 20, y, uiSmallFont());
 }
 
 float clamp01(float v) {
@@ -1103,9 +1189,9 @@ void drawSignalRow(const MonoIcon& icon, const char* label, const String& signal
   const int gaugeX = UI_MARGIN_X + 10;
   const int gaugeW = M5.Display.width() - UI_MARGIN_X * 2 - 20;
   drawLabeledIcon(icon, label, labelX, y + 4);
-  M5.Display.drawString(signalGlyph(signal), stateX, y + 38, &fonts::Font4);
+  drawUiTextLeft(signalGlyph(signal), stateX, y + 38, uiBodyFont());
   drawMonoIcon(M5.Display.width() - UI_MARGIN_X - 30, y + 34, signalIcon(signal), 1);
-  M5.Display.drawRightString(signalMeaning(label, signal), M5.Display.width() - UI_MARGIN_X - 48, y + 40, &fonts::Font2);
+  drawUiTextRight(signalMeaning(label, signal), M5.Display.width() - UI_MARGIN_X - 48, y + 40, uiSmallFont());
   drawCenteredGauge(gaugeX, y + 98, gaugeW, 22, gaugeValue);
   M5.Display.drawLine(UI_MARGIN_X, y + 148, M5.Display.width() - UI_MARGIN_X, y + 148, TFT_BLACK);
 }
@@ -1122,10 +1208,10 @@ void drawSimpleLineGraphFloat(int x, int y, int w, int h, const MonoIcon& icon,
                               size_t maxRenderPoints, bool drawAllMarkers) {
   M5.Display.drawRect(x, y, w, h, TFT_BLACK);
   drawMonoIcon(x + 6, y + 4, icon, 1);
-  M5.Display.drawString(title, x + 30, y + 4, &fonts::Font2);
+  drawUiTextLeft(title, x + 30, y + 4, uiSmallFont());
 
   if (n < 2) {
-    M5.Display.drawCentreString("NO DATA", x + w / 2, y + h / 2 - 8, &fonts::Font2);
+    drawUiTextCenter(ui_text::kNoData, x + w / 2, y + h / 2 - 8, uiSmallFont());
     return;
   }
 
@@ -1185,12 +1271,12 @@ void drawSimpleLineGraphFloat(int x, int y, int w, int h, const MonoIcon& icon,
 }
 
 void drawSlideSummary() {
-  drawHeader("SLIDE 1  CURRENT");
+  drawHeader(ui_text::kSlide1Title);
   const int cardW = M5.Display.width() - UI_MARGIN_X * 2;
   const int currentY = 92;
-  const int currentH = 308;
-  const int changeY = 440;
-  const int changeH = 452;
+  const int currentH = 278;
+  const int changeY = 404;
+  const int changeH = 488;
   const int innerX = UI_MARGIN_X + 20;
   const int innerW = cardW - 40;
   const int colGap = 34;
@@ -1205,37 +1291,39 @@ void drawSlideSummary() {
   bool lightActive = isLightRainFactorActive();
   String lightDisplay = lightActive ? lArrow : String("NIGHT");
   int rainDenom = lightActive ? 3 : 2;
-  int rainSigns = (isRainSign("PRESSURE", pArrow) ? 1 : 0) +
-                  (isRainSign("HUMIDITY", hArrow) ? 1 : 0) +
-                  ((lightActive && isRainSign("LIGHT", lArrow)) ? 1 : 0);
+  int rainSigns = (isRainSign(ui_text::kPressure, pArrow) ? 1 : 0) +
+                  (isRainSign(ui_text::kHumidity, hArrow) ? 1 : 0) +
+                  ((lightActive && isRainSign(ui_text::kLight, lArrow)) ? 1 : 0);
   String luxValue = formatFloat1(g_luxRaw.lux);
   if (!lightActive && g_luxRaw.valid) {
-    luxValue += "  night";
+    luxValue += "  ";
+    luxValue += ui_text::kNight;
   }
 
-  drawCard(UI_MARGIN_X, currentY, cardW, currentH, "CURRENT VALUES");
-  drawMetricWithIcon(ICON_TEMP, "TEMP", formatFloat1(g_env4.temperature), "C", innerX, 126, leftUnitX);
-  drawMetricWithIcon(ICON_LIGHT, "LUX", luxValue, "", rightColX, 126, 0);
-  drawMetricWithIcon(ICON_HUMIDITY, "HUM", formatFloat1(g_env4.humidity), "%", innerX, 248, leftUnitX);
-  drawMetricWithIcon(ICON_PRESSURE, "PRES", formatFloat1(g_env4.pressure), "hPa", rightColX, 248, rightUnitX);
+  drawCard(UI_MARGIN_X, currentY, cardW, currentH, ui_text::kCurrentValues);
+  drawMetricWithIcon(ICON_TEMP, ui_text::kTemp, formatFloat1(g_env4.temperature), "C", innerX, 126, leftUnitX);
+  drawMetricWithIcon(ICON_LIGHT, ui_text::kLux, luxValue, "", rightColX, 126, 0);
+  drawMetricWithIcon(ICON_HUMIDITY, ui_text::kHum, formatFloat1(g_env4.humidity), "%", innerX, 248, leftUnitX);
+  drawMetricWithIcon(ICON_PRESSURE, ui_text::kPres, formatFloat1(g_env4.pressure), "hPa", rightColX, 248, rightUnitX);
 
-  drawCard(UI_MARGIN_X, changeY, cardW, changeH, "RECENT CHANGES");
-  drawChangeSummaryRow(ICON_PRESSURE, "PRESSURE", pArrow, 492);
-  drawChangeSummaryRow(ICON_HUMIDITY, "HUMIDITY", hArrow, 550);
-  drawChangeSummaryRow(ICON_LIGHT, "LIGHT", lightDisplay, 608);
-  M5.Display.drawLine(innerX, 680, UI_MARGIN_X + cardW - 20, 680, TFT_BLACK);
-  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), innerX, 712, &fonts::Font4);
-  drawPatternSummaryRow(innerX, 754, "Now:", pArrow, hArrow, lArrow, lightActive, false);
-  drawPatternSummaryRow(innerX, 794, "Rain pattern:", pArrow, hArrow, lArrow, lightActive, true);
-  M5.Display.drawString(lightActive ? "Pressure down  Humidity up  Light down in daytime"
-                                   : "At night, use pressure and humidity.",
-                        innerX + 76, 836, &fonts::Font2);
+  drawCard(UI_MARGIN_X, changeY, cardW, changeH, ui_text::kRecentChanges);
+  drawChangeSummaryRow(ICON_PRESSURE, ui_text::kPressure, pArrow, 450);
+  drawChangeSummaryRow(ICON_HUMIDITY, ui_text::kHumidity, hArrow, 504);
+  drawChangeSummaryRow(ICON_LIGHT, ui_text::kLight, lightDisplay, 558);
+  M5.Display.drawLine(innerX, 610, UI_MARGIN_X + cardW - 20, 610, TFT_BLACK);
+  char rainSignsBuf[32];
+  snprintf(rainSignsBuf, sizeof(rainSignsBuf), ui_text::kRainSignsFmt, rainSigns, rainDenom);
+  drawUiTextLeft(rainSignsBuf, innerX, 634, uiBodyFont());
+  drawPatternSummaryRow(innerX, 668, ui_text::kNow, pArrow, hArrow, lArrow, lightActive, false);
+  drawPatternSummaryRow(innerX, 704, ui_text::kRainPattern, pArrow, hArrow, lArrow, lightActive, true);
+  drawUiTextLeft(lightActive ? ui_text::kDayRule : ui_text::kNightRule,
+                 innerX + 76, 748, uiSmallFont());
 
   drawFooter();
 }
 
 void drawSlideSignals() {
-  drawHeader("SLIDE 2  SIGNALS");
+  drawHeader(ui_text::kSlide2Title);
 
   String pArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).pressure - g_envHist.at(0).pressure : NAN);
   String hArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).humidity - g_envHist.at(0).humidity : NAN);
@@ -1243,24 +1331,25 @@ void drawSlideSignals() {
   bool lightActive = isLightRainFactorActive();
   String lightDisplay = lightActive ? lArrow : String("NIGHT");
   int rainDenom = lightActive ? 3 : 2;
-  int rainSigns = (isRainSign("PRESSURE", pArrow) ? 1 : 0) +
-                  (isRainSign("HUMIDITY", hArrow) ? 1 : 0) +
-                  ((lightActive && isRainSign("LIGHT", lArrow)) ? 1 : 0);
+  int rainSigns = (isRainSign(ui_text::kPressure, pArrow) ? 1 : 0) +
+                  (isRainSign(ui_text::kHumidity, hArrow) ? 1 : 0) +
+                  ((lightActive && isRainSign(ui_text::kLight, lArrow)) ? 1 : 0);
 
-  drawSignalRow(ICON_PRESSURE, "PRESSURE", pArrow, normalizedPressureTrend(), 92);
-  drawSignalRow(ICON_HUMIDITY, "HUMIDITY", hArrow, normalizedHumidityTrend(), 262);
-  drawSignalRow(ICON_LIGHT, "LIGHT", lightDisplay, lightActive ? normalizedLuxTrend() : 0.0f, 432);
+  drawSignalRow(ICON_PRESSURE, ui_text::kPressure, pArrow, normalizedPressureTrend(), 88);
+  drawSignalRow(ICON_HUMIDITY, ui_text::kHumidity, hArrow, normalizedHumidityTrend(), 242);
+  drawSignalRow(ICON_LIGHT, ui_text::kLight, lightDisplay, lightActive ? normalizedLuxTrend() : 0.0f, 396);
 
-  drawCard(UI_MARGIN_X, 604, M5.Display.width() - UI_MARGIN_X * 2, 212, "INTERPRET");
-  M5.Display.drawString("Check order: Pressure -> Humidity -> Light", UI_MARGIN_X + 18, 640, &fonts::Font2);
-  M5.Display.drawString(String("Rain signs: ") + String(rainSigns) + " / " + String(rainDenom), UI_MARGIN_X + 18, 666, &fonts::Font4);
-  drawPatternSummaryRow(UI_MARGIN_X + 18, 696, "Now:", pArrow, hArrow, lArrow, lightActive, false);
-  drawPatternSummaryRow(UI_MARGIN_X + 18, 732, "Rain pattern:", pArrow, hArrow, lArrow, lightActive, true);
-  M5.Display.drawString(lightActive ? "Pressure down  Humidity up  Light down in daytime"
-                                   : "At night, use pressure and humidity.",
-                        UI_MARGIN_X + 76, 770, &fonts::Font2);
-  M5.Display.drawString("What changed first?", UI_MARGIN_X + 18, 794, &fonts::Font2);
-  M5.Display.drawRightString("RAIN COMING?", M5.Display.width() - UI_MARGIN_X - 34, 794, &fonts::Font2);
+  drawCard(UI_MARGIN_X, 544, M5.Display.width() - UI_MARGIN_X * 2, 278, ui_text::kInterpret);
+  drawUiTextLeft(ui_text::kCheckOrder, UI_MARGIN_X + 18, 574, uiSmallFont());
+  char rainSignsBuf[32];
+  snprintf(rainSignsBuf, sizeof(rainSignsBuf), ui_text::kRainSignsFmt, rainSigns, rainDenom);
+  drawUiTextLeft(rainSignsBuf, UI_MARGIN_X + 18, 608, uiBodyFont());
+  drawPatternSummaryRow(UI_MARGIN_X + 18, 644, ui_text::kNow, pArrow, hArrow, lArrow, lightActive, false);
+  drawPatternSummaryRow(UI_MARGIN_X + 18, 680, ui_text::kRainPattern, pArrow, hArrow, lArrow, lightActive, true);
+  drawUiTextLeft(lightActive ? ui_text::kDayRule : ui_text::kNightRule,
+                 UI_MARGIN_X + 76, 724, uiSmallFont());
+  drawUiTextLeft(ui_text::kWhatChangedFirst, UI_MARGIN_X + 18, 774, uiSmallFont());
+  drawUiTextRight(ui_text::kRainComing, M5.Display.width() - UI_MARGIN_X - 34, 774, uiSmallFont());
 
   drawFooter();
 }
@@ -1290,67 +1379,71 @@ void drawTrendGraphsSlide(const char* title, uint32_t targetWindowMin, const cha
   String midLabel = formatClockOnly((oldestTs > 0 && newestTs >= oldestTs) ? (oldestTs + (newestTs - oldestTs) / 2) : 0);
   String endLabel = formatClockOnly(newestTs);
   drawSimpleLineGraphFloat(UI_MARGIN_X, 92, M5.Display.width() - UI_MARGIN_X * 2, 188,
-                           ICON_PRESSURE, g_pressureGraphVals, envN, "PRESSURE", "hPa",
+                           ICON_PRESSURE, g_pressureGraphVals, envN, ui_text::kPressure, "hPa",
                            startLabel, midLabel, endLabel, maxRenderPoints, drawAllMarkers);
   drawSimpleLineGraphFloat(UI_MARGIN_X, 302, M5.Display.width() - UI_MARGIN_X * 2, 188,
-                           ICON_HUMIDITY, g_humidityGraphVals, envN, "HUMIDITY", "%",
+                           ICON_HUMIDITY, g_humidityGraphVals, envN, ui_text::kHumidity, "%",
                            startLabel, midLabel, endLabel, maxRenderPoints, drawAllMarkers);
   drawSimpleLineGraphFloat(UI_MARGIN_X, 512, M5.Display.width() - UI_MARGIN_X * 2, 188,
-                           ICON_LIGHT, g_luxGraphVals, luxN, "LUX", "",
+                           ICON_LIGHT, g_luxGraphVals, luxN, ui_text::kLux, "",
                            startLabel, midLabel, endLabel, maxRenderPoints, drawAllMarkers);
 
   M5.Display.drawLine(UI_MARGIN_X, 726, M5.Display.width() - UI_MARGIN_X, 726, TFT_BLACK);
-  M5.Display.drawString(String("NOW  ") + prompt, UI_MARGIN_X + 4, 744, &fonts::Font2);
-  M5.Display.drawRightString(String("WINDOW ") + formatClockOnly(oldestTs) + " - " + formatClockOnly(newestTs) +
-                             "  (" + String(spanMin) + " min / target " + String(targetWindowMin) + " min)",
-                             M5.Display.width() - UI_MARGIN_X, 744, &fonts::Font2);
-  drawSummaryIconRow(ICON_PRESSURE, "PRES", formatFloat1(g_env4.pressure) + " hPa", UI_MARGIN_X + 16, 776);
-  drawSummaryIconRow(ICON_HUMIDITY, "HUM", formatFloat1(g_env4.humidity) + " %", UI_MARGIN_X + 16, 808);
-  drawSummaryIconRow(ICON_LIGHT, "LUX", formatFloat1(g_luxRaw.lux), UI_MARGIN_X + 16, 840);
+  char nowBuf[64];
+  snprintf(nowBuf, sizeof(nowBuf), ui_text::kNowPromptFmt, prompt);
+  drawUiTextLeft(nowBuf, UI_MARGIN_X + 4, 740, uiSmallFont());
+  char windowBuf[96];
+  snprintf(windowBuf, sizeof(windowBuf), ui_text::kWindowFmt,
+           formatClockOnly(oldestTs).c_str(), formatClockOnly(newestTs).c_str(),
+           (unsigned long)spanMin, (unsigned long)targetWindowMin);
+  drawUiTextRight(windowBuf, M5.Display.width() - UI_MARGIN_X, 740, uiSmallFont());
+  drawSummaryIconRow(ICON_PRESSURE, ui_text::kPres, formatFloat1(g_env4.pressure) + " hPa", UI_MARGIN_X + 16, 772);
+  drawSummaryIconRow(ICON_HUMIDITY, ui_text::kHum, formatFloat1(g_env4.humidity) + " %", UI_MARGIN_X + 16, 804);
+  drawSummaryIconRow(ICON_LIGHT, ui_text::kLux, formatFloat1(g_luxRaw.lux), UI_MARGIN_X + 16, 836);
 
   drawFooter();
 }
 
 void drawSlideGraphsShort() {
-  drawTrendGraphsSlide("SLIDE 3  SHORT-TERM (15 min)", SHORT_WINDOW_MIN, "What is changing now?");
+  drawTrendGraphsSlide(ui_text::kSlide3Title, SHORT_WINDOW_MIN, ui_text::kShortPrompt);
 }
 
 void drawSlideGraphsLong() {
-  drawTrendGraphsSlide("SLIDE 4  LONG-TERM (120 min)", LONG_WINDOW_MIN, "Is the trend continuing?");
+  drawTrendGraphsSlide(ui_text::kSlide4Title, LONG_WINDOW_MIN, ui_text::kLongPrompt);
 }
 
 void drawSlideStatus() {
-  drawHeader("STATUS");
+  drawHeader(ui_text::kStatusTitle);
   const int cardW = M5.Display.width() - UI_MARGIN_X * 2;
   const int healthX = UI_MARGIN_X + 18;
   const int healthRight = M5.Display.width() - UI_MARGIN_X - 22;
   const int networkX = UI_MARGIN_X + 18;
   const int networkRight = M5.Display.width() - UI_MARGIN_X - 22;
 
-  drawCard(UI_MARGIN_X, 92, cardW, 252, "HEALTH");
+  drawCard(UI_MARGIN_X, 92, cardW, 252, ui_text::kHealth);
   drawMonoIcon(M5.Display.width() - UI_MARGIN_X - 38, 102, ICON_SENSOR, 1);
-  drawTextRowAligned("SENSOR", String(g_luxStatus.sensor_ready ? "READY" : "FAIL"),
+  drawTextRowAligned(ui_text::kSensor, String(g_luxStatus.sensor_ready ? "READY" : "FAIL"),
                      healthX, healthRight - 28, 170, &fonts::Font4);
-  drawTextRowAligned("STATUS", String(g_luxStatus.status),
+  drawTextRowAligned(ui_text::kStatus, String(g_luxStatus.status),
                      healthX, healthRight - 28, 224, &fonts::Font4);
-  drawTextRowAligned("REASON", String(g_luxStatus.reason),
+  drawTextRowAligned(ui_text::kReason, String(g_luxStatus.reason),
                      healthX, healthRight - 28, 278, &fonts::Font4);
 
-  drawCard(UI_MARGIN_X, 370, cardW, 396, "NETWORK");
+  drawCard(UI_MARGIN_X, 370, cardW, 396, ui_text::kNetwork);
   drawMonoIcon(M5.Display.width() - UI_MARGIN_X - 38, 380, ICON_WIFI, 1);
-  drawTextRowAligned("WIFI", String(g_luxStatus.wifi),
+  drawTextRowAligned(ui_text::kWifi, String(g_luxStatus.wifi),
                      networkX, networkRight - 28, 444, &fonts::Font4);
-  drawTextRowAligned("IP", String(g_luxStatus.ip),
+  drawTextRowAligned(ui_text::kIp, String(g_luxStatus.ip),
                      networkX, networkRight - 28, 496, &fonts::Font4);
-  drawTextRowAligned("ERR CNT", String(g_luxStatus.sensor_error_count),
+  drawTextRowAligned(ui_text::kErrCnt, String(g_luxStatus.sensor_error_count),
                      networkX, networkRight - 28, 548, &fonts::Font4);
   drawMonoIcon(networkX, 618, ICON_MQTT, 1);
-  drawTextRowAligned("MQTT RETRY", String(g_luxStatus.mqtt_reconnect_count),
+  drawTextRowAligned(ui_text::kMqttRetry, String(g_luxStatus.mqtt_reconnect_count),
                      networkX, networkRight - 28, 600, &fonts::Font4);
   M5.Display.drawLine(UI_MARGIN_X + 18, 670, M5.Display.width() - UI_MARGIN_X - 18, 670, TFT_BLACK);
   drawMonoIcon(networkX, 680, ICON_CLOCK, 1);
-  drawTextRowAligned("UPDATED", formatUnixTime(g_luxStatus.unix_time),
-                     networkX, networkRight - 28, 698, &fonts::Font2);
+  drawTextRowAligned(ui_text::kUpdated, formatUnixTime(g_luxStatus.unix_time),
+                     networkX, networkRight - 28, 698, isJapaneseUi() ? uiSmallFont() : &fonts::Font2);
 
   if (strcmp(g_luxStatus.status, "ok") != 0) {
     const int warnX = 20;
@@ -1360,7 +1453,7 @@ void drawSlideStatus() {
     M5.Display.fillRect(warnX, warnY, warnW, warnH, TFT_BLACK);
     M5.Display.setTextColor(TFT_WHITE, TFT_BLACK);
     drawMonoIcon(warnX + 10, warnY + 10, ICON_WARNING, 1);
-    M5.Display.drawCentreString("WARNING: SENSOR / MQTT ISSUE", M5.Display.width() / 2, warnY + 10, &fonts::Font2);
+    drawUiTextCenter(ui_text::kWarningSensorMqtt, M5.Display.width() / 2, warnY + 10, uiSmallFont(), TFT_WHITE, TFT_BLACK);
     M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
   }
 
@@ -1400,7 +1493,7 @@ void setup() {
 
   M5.Display.fillScreen(TFT_WHITE);
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
-  M5.Display.drawString("BOOTING...", 30, 30, &fonts::Font4);
+  drawUiTextLeft(ui_text::kBooting, 30, 30, uiBodyFont());
   Serial.println("[SETUP] boot screen drawn");
 
   g_sdReady = SD.begin(GPIO_NUM_47, SPI, 40000000);  // 40 MHz for stable SD access on PaperS3.

@@ -14,3 +14,8 @@ static constexpr const char* CONFIG_NTP_SERVER_2 = "pool.ntp.org";
 static constexpr const char* CONFIG_TZ_INFO      = "JST-9";
 static constexpr double CONFIG_SITE_LATITUDE     = 35.8617;
 static constexpr double CONFIG_SITE_LONGITUDE    = 139.6455;
+
+// UI language
+static constexpr uint8_t UI_LANG_EN = 0;
+static constexpr uint8_t UI_LANG_JA = 1;
+static constexpr uint8_t CONFIG_UI_LANG = UI_LANG_EN;
