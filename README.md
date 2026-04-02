@@ -88,7 +88,7 @@ Shows:
 
 - short-term rolling graphs for pressure / humidity / lux
 - current values summary strip
-- question: `What is changing now?` / `今、何が変わっている？`
+- question: `What is changing now?` / `今、何が変化している？`
 
 Target window:
 
@@ -100,13 +100,13 @@ Shows:
 
 - long-term rolling graphs for pressure / humidity / lux
 - current values summary strip
-- question: `Is the trend continuing?` / `流れは続いている？`
+- question: `Is the trend continuing?` / `今までの流れは続いている？`
 
 Target window:
 
 - `120 min`
 
-### Status Screen / 状態
+### Status Screen / ネットワーク
 
 Status is a separate auxiliary screen, not part of the normal 4-slide loop.
 
@@ -141,7 +141,7 @@ Slides auto-rotate across the 4 teaching slides.
 
 The footer center button opens:
 
-- `STATUS` from the teaching slides
+- `STATUS / ネットワーク` from the teaching slides
 - `BACK` from the status screen
 
 There is also a swipe-up gesture from the footer area to open the status screen.

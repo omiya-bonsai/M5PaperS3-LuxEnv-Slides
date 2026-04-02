@@ -39,7 +39,7 @@ The goal is to preserve why key choices were made, not just what the current cod
 ### 4. Keep `Status` as a footer-accessed auxiliary screen
 
 - Decision:
-  - Open `Status` only from the footer button or swipe-up gesture.
+  - Open the auxiliary network/status screen only from the footer button or swipe-up gesture.
 - Reason:
   - Status information is useful, but lower priority than the learning slides.
   - This keeps the main loop focused on observation and inference.
@@ -185,4 +185,5 @@ The current development focus is:
 - finishing Japanese UI readability
 - tightening Slide 1 and Slide 2 helper areas
 - keeping Slide 3 and Slide 4 stable
+- keeping terminology consistent in Japanese (`明るさ`, `雨の手がかり`, `雨が近い並び`, `もうすぐ雨が降るかな？`)
 - maintaining the project as a learning tool rather than expanding operational features

@@ -31,6 +31,7 @@ SD.begin(GPIO_NUM_47, SPI, 40000000)
 - 日本語 UI では [ja_assets.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ja_assets.h) の日本語フォント設定を使う
 - 文言切替は [ui_text.h](/Users/tomato/Documents/Arduino/M5PaperS3-LuxEnv-Slides/ui_text.h) に集約している
 - `config.h` の `CONFIG_UI_LANG` で英語 / 日本語を切り替える
+- 日本語 UI では `LUX` の表現を `明るさ` に統一している
 
 ## 既知のビルドエラー
 
