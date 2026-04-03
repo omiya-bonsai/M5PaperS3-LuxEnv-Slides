@@ -25,7 +25,7 @@ and think: **"Is rain getting closer?"**
 
 Demo video:
 
-[![Watch the demo](https://img.youtube.com/vi/j70QptzSllY/maxresdefault.jpg)](https://youtu.be/j70QptzSllY)
+[![Watch the demo](https://img.youtube.com/vi/zbGIDU4RGRo/maxresdefault.jpg)](https://youtu.be/zbGIDU4RGRo)
 
 ## Current UI State
 
