@@ -49,6 +49,7 @@ static constexpr float NIGHT_LUX_THRESHOLD = 5.0f;
 static constexpr uint8_t MAIN_SLIDE_COUNT = 4;
 static constexpr uint8_t STATUS_SCREEN_INDEX = 4;
 static constexpr int SD_CS_PIN = 47;
+static constexpr float SIGNAL_STEADY_DEADZONE = 0.07f;
 
 struct Env4Data {
   uint32_t ts = 0;
@@ -1162,9 +1163,10 @@ const char* signalGlyph(const String& signal) {
 
 String signalStrengthLabel(const String& signal, float gaugeValue) {
   if (signal == "NIGHT") return String(ui_text::kNight);
-  if (signal != "UP" && signal != "DOWN") return String(ui_text::kSteady);
-
   float magnitude = fabs(gaugeValue);
+  if (signal != "UP" && signal != "DOWN") return String(ui_text::kSteady);
+  if (magnitude < SIGNAL_STEADY_DEADZONE) return String(ui_text::kSteady);
+
   bool strong = magnitude >= 0.66f;
   bool mild = magnitude < 0.33f;
 
@@ -1335,6 +1337,10 @@ void drawCenteredGauge(int x, int y, int w, int h, float normalized) {
   M5.Display.drawLine(mid, y + 1, mid, y + h - 2, TFT_BLACK);
 
   float clamped = clamp01(fabs(normalized));
+  if (clamped < SIGNAL_STEADY_DEADZONE) {
+    M5.Display.fillRect(mid - 6, innerY, 12, innerH, TFT_BLACK);
+    return;
+  }
   int halfW = (w - 6) / 2;
   int fillW = (int)(halfW * clamped);
   if (fillW <= 0) return;
@@ -1550,12 +1556,11 @@ void drawSlideSignalsBody() {
   drawSignalRow(ICON_LIGHT, ui_text::kLight, lightDisplay, lightActive ? normalizedLuxTrend() : 0.0f, 396);
 
   drawCard(UI_MARGIN_X, 544, M5.Display.width() - UI_MARGIN_X * 2, 278, ui_text::kInterpret);
-  drawUiTextLeft(ui_text::kCheckOrder, UI_MARGIN_X + 18, 574, uiSmallFont());
   char rainSignsBuf[32];
   snprintf(rainSignsBuf, sizeof(rainSignsBuf), ui_text::kRainSignsFmt, rainSigns, rainDenom);
-  drawUiTextLeft(rainSignsBuf, UI_MARGIN_X + 18, 608, uiBodyFont());
-  drawUiTextLeft(rainClueHint(pressureMatch, humidityMatch, lightMatch, lightActive), UI_MARGIN_X + 18, 636, uiSmallFont());
-  drawPatternSummaryPair(UI_MARGIN_X + 18, 676, 728, pArrow, hArrow, lArrow, lightActive);
+  drawUiTextLeft(rainSignsBuf, UI_MARGIN_X + 18, 584, uiBodyFont());
+  drawUiTextLeft(rainClueHint(pressureMatch, humidityMatch, lightMatch, lightActive), UI_MARGIN_X + 18, 616, uiSmallFont());
+  drawPatternSummaryPair(UI_MARGIN_X + 18, 656, 708, pArrow, hArrow, lArrow, lightActive);
   drawUiTextLeft(currentSignalPrompt(), UI_MARGIN_X + 18, 784, uiSmallFont());
   drawUiTextRight(ui_text::kRainComing, M5.Display.width() - UI_MARGIN_X - 34, 784, uiSmallFont());
 }
