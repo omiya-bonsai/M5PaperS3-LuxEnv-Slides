@@ -48,6 +48,7 @@ static constexpr uint32_t NIGHT_LUX_WINDOW_MIN = 10;
 static constexpr float NIGHT_LUX_THRESHOLD = 5.0f;
 static constexpr uint8_t MAIN_SLIDE_COUNT = 4;
 static constexpr uint8_t STATUS_SCREEN_INDEX = 4;
+static constexpr int SD_CS_PIN = 47;
 
 struct Env4Data {
   uint32_t ts = 0;
@@ -939,10 +940,13 @@ void drawMetricWithIcon(const MonoIcon& icon, const char* label, const String& v
   M5.Display.fillRect(x, y + icon.height + 8, 220, 54, TFT_WHITE);
   M5.Display.drawString(value, x, y + icon.height + 14, &fonts::Font6);
   if (unit.length() > 0) {
+    const int unitGap = 10;
+    const int valueWidth = static_cast<int>(M5.Display.textWidth(value, &fonts::Font6));
+    const int unitDrawX = max(unitX, x + valueWidth + unitGap);
     // Clear the unit area separately to avoid residual glyphs between the value and unit.
-    M5.Display.fillRect(unitX - 10, y + icon.height + 30, 72, 24, TFT_WHITE);
+    M5.Display.fillRect(unitDrawX - 10, y + icon.height + 30, 72, 24, TFT_WHITE);
     M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
-    M5.Display.drawString(unit, unitX, y + icon.height + 36, &fonts::Font2);
+    M5.Display.drawString(unit, unitDrawX, y + icon.height + 36, &fonts::Font2);
   }
 }
 
@@ -1384,8 +1388,6 @@ void drawSlideSummaryBody() {
   drawUiTextLeft(rainSignsBuf, innerX, 634, uiBodyFont());
   drawPatternSummaryRow(innerX, 668, ui_text::kNow, pArrow, hArrow, lArrow, lightActive, false);
   drawPatternSummaryRow(innerX, 704, ui_text::kRainPattern, pArrow, hArrow, lArrow, lightActive, true);
-  drawUiTextLeft(lightActive ? ui_text::kDayRule : ui_text::kNightRule,
-                 innerX + 76, 748, uiSmallFont());
 }
 
 void drawSlideSignalsBody() {
@@ -1411,8 +1413,6 @@ void drawSlideSignalsBody() {
   drawUiTextLeft(rainSignsBuf, UI_MARGIN_X + 18, 608, uiBodyFont());
   drawPatternSummaryRow(UI_MARGIN_X + 18, 644, ui_text::kNow, pArrow, hArrow, lArrow, lightActive, false);
   drawPatternSummaryRow(UI_MARGIN_X + 18, 680, ui_text::kRainPattern, pArrow, hArrow, lArrow, lightActive, true);
-  drawUiTextLeft(lightActive ? ui_text::kDayRule : ui_text::kNightRule,
-                 UI_MARGIN_X + 76, 724, uiSmallFont());
   drawUiTextLeft(ui_text::kWhatChangedFirst, UI_MARGIN_X + 18, 774, uiSmallFont());
   drawUiTextRight(ui_text::kRainComing, M5.Display.width() - UI_MARGIN_X - 34, 774, uiSmallFont());
 }
@@ -1562,7 +1562,7 @@ void setup() {
   drawUiTextLeft(ui_text::kBooting, 30, 30, uiBodyFont());
   Serial.println("[SETUP] boot screen drawn");
 
-  g_sdReady = SD.begin(GPIO_NUM_47, SPI, 40000000);  // 40 MHz for stable SD access on PaperS3.
+  g_sdReady = SD.begin(SD_CS_PIN, SPI, 40000000);  // 40 MHz for stable SD access on PaperS3.
   Serial.printf("[SETUP] SD.begin() -> %s\n", g_sdReady ? "ok" : "ng");
   if (g_sdReady) {
     ensureLogDirs();
