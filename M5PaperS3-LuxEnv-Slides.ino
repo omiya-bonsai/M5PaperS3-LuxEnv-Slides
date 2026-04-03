@@ -174,6 +174,21 @@ bool g_renderInProgress = false;
 bool g_sdReady = false;
 bool g_timeValid = false;
 uint8_t g_lastRenderedSlide = 255;
+uint8_t g_signalPromptIndex = 0;
+
+static constexpr const char* kSignalPromptsJa[] = {
+  "3つの変化はそろっているかな？",
+  "雨のサインはいくつあるかな？",
+  "今の変化は雨の並びに近いかな？",
+  "どのサインが雨の手がかりかな？",
+};
+
+static constexpr const char* kSignalPromptsEn[] = {
+  "Do the three changes line up?",
+  "How many rain signs can you find?",
+  "Does the current pattern look rainy?",
+  "Which sign points to rain?",
+};
 
 // ---------------------- utilities ----------------------------
 String formatUnixTime(uint32_t ts) {
@@ -187,6 +202,34 @@ String formatUnixTime(uint32_t ts) {
            tmLocal.tm_year + 1900, tmLocal.tm_mon + 1, tmLocal.tm_mday,
            tmLocal.tm_hour, tmLocal.tm_min);
   return String(buf);
+}
+
+size_t signalPromptCount() {
+  return isJapaneseUi()
+      ? (sizeof(kSignalPromptsJa) / sizeof(kSignalPromptsJa[0]))
+      : (sizeof(kSignalPromptsEn) / sizeof(kSignalPromptsEn[0]));
+}
+
+const char* currentSignalPrompt() {
+  size_t count = signalPromptCount();
+  if (count == 0) return ui_text::kWhatChangedFirst;
+  size_t index = g_signalPromptIndex % count;
+  return isJapaneseUi() ? kSignalPromptsJa[index] : kSignalPromptsEn[index];
+}
+
+void advanceSignalPrompt() {
+  size_t count = signalPromptCount();
+  if (count == 0) return;
+  if (count == 1) {
+    g_signalPromptIndex = 0;
+    return;
+  }
+
+  uint8_t nextIndex = g_signalPromptIndex;
+  while (nextIndex == g_signalPromptIndex) {
+    nextIndex = (uint8_t)random((long)count);
+  }
+  g_signalPromptIndex = nextIndex;
 }
 
 String formatFloat1(float v, const char* fallback = "--") {
@@ -1097,6 +1140,7 @@ size_t collectLuxWindow(float* luxVals, uint32_t* tsVals, uint32_t windowMin) {
 }
 
 void drawCard(int x, int y, int w, int h, const char* title) {
+  M5.Display.fillRect(x + 1, y + 1, w - 2, h - 2, TFT_WHITE);
   M5.Display.drawRect(x, y, w, h, TFT_BLACK);
   drawUiTextLeft(title, x + 10, y + 10, uiSmallFont());
 }
@@ -1114,6 +1158,35 @@ const char* signalGlyph(const String& signal) {
   if (signal == "UP") return ui_text::kAscend;
   if (signal == "DOWN") return ui_text::kDescend;
   return ui_text::kSteady;
+}
+
+String signalStrengthLabel(const String& signal, float gaugeValue) {
+  if (signal == "NIGHT") return String(ui_text::kNight);
+  if (signal != "UP" && signal != "DOWN") return String(ui_text::kSteady);
+
+  float magnitude = fabs(gaugeValue);
+  bool strong = magnitude >= 0.66f;
+  bool mild = magnitude < 0.33f;
+
+  if (isJapaneseUi()) {
+    if (signal == "UP") {
+      if (strong) return String("大きく上向き");
+      if (mild) return String("やや上向き");
+      return String("上向き");
+    }
+    if (strong) return String("大きく下向き");
+    if (mild) return String("やや下向き");
+    return String("下向き");
+  }
+
+  if (signal == "UP") {
+    if (strong) return String("STRONGLY UP");
+    if (mild) return String("SLIGHTLY UP");
+    return String("UP");
+  }
+  if (strong) return String("STRONGLY DOWN");
+  if (mild) return String("SLIGHTLY DOWN");
+  return String("DOWN");
 }
 
 const MonoIcon& signalIcon(const String& signal) {
@@ -1147,6 +1220,32 @@ const char* signalMeaning(const char* label, const String& signal) {
   return ui_text::kWatch;
 }
 
+String rainClueHint(bool pressureMatch, bool humidityMatch, bool lightMatch, bool lightActive) {
+  int matches = (pressureMatch ? 1 : 0) + (humidityMatch ? 1 : 0) + (lightMatch ? 1 : 0);
+
+  if (isJapaneseUi()) {
+    if (matches == 3) return String("3つとも雨の並びです");
+    if (pressureMatch && humidityMatch) return String("気圧と湿度が雨の並びです");
+    if (pressureMatch && lightMatch) return String("気圧と明るさが雨の並びです");
+    if (humidityMatch && lightMatch) return String("湿度と明るさが雨の並びです");
+    if (pressureMatch) return String("気圧に雨のサインがあります");
+    if (humidityMatch) return String("湿度に雨のサインがあります");
+    if (lightMatch) return String("明るさに雨のサインがあります");
+    if (!lightActive) return String("夜は気圧と湿度を中心に見てみよう");
+    return String("雨の並びはまだそろっていません");
+  }
+
+  if (matches == 3) return String("All three match the rain pattern.");
+  if (pressureMatch && humidityMatch) return String("Pressure and humidity match rain.");
+  if (pressureMatch && lightMatch) return String("Pressure and light match rain.");
+  if (humidityMatch && lightMatch) return String("Humidity and light match rain.");
+  if (pressureMatch) return String("Pressure shows a rain sign.");
+  if (humidityMatch) return String("Humidity shows a rain sign.");
+  if (lightMatch) return String("Light shows a rain sign.");
+  if (!lightActive) return String("At night, focus on pressure and humidity.");
+  return String("The rain pattern is not aligned yet.");
+}
+
 void drawSignalToken(int x, int y, const char* label, const String& signal) {
   drawUiTextLeft(label, x, y, uiSmallFont());
   int iconX = x + uiTextWidth(label, uiSmallFont()) + 8;
@@ -1157,58 +1256,55 @@ void drawSignalToken(int x, int y, const char* label, const String& signal) {
   drawMonoIcon(iconX, y - 10, signalIcon(signal), 1);
 }
 
-int patternTokenWidth(const char* label, const String& signal) {
-  const int labelW = uiTextWidth(label, uiSmallFont());
-  const int gap = 8;
-  if (signal == "NIGHT") {
-    return labelW + gap + uiTextWidth(ui_text::kNight, uiSmallFont());
-  }
-  return labelW + gap + signalIcon(signal).width;
-}
-
-void drawPatternMatchHighlight(int x, int topY, int bottomY, const char* label,
+void drawPatternMatchHighlight(int x, int width, int topY, int bottomY,
                                const String& topSignal, const String& bottomSignal) {
   if (topSignal != bottomSignal) return;
   if (topSignal == "NIGHT") return;
 
-  const int rectX = x - 8;
-  const int rectY = topY - 8;
-  const int rectW = max(patternTokenWidth(label, topSignal), patternTokenWidth(label, bottomSignal)) + 16;
-  const int rectBottom = bottomY + M5.Display.fontHeight(uiSmallFont()) + 8;
+  const int rectX = x - 12;
+  const int rectY = topY - 10;
+  const int rectW = width + 16;
+  const int rectBottom = bottomY + M5.Display.fontHeight(uiSmallFont()) + 10;
   const int rectH = rectBottom - rectY;
-  M5.Display.drawRoundRect(rectX, rectY, rectW, rectH, 8, TFT_BLACK);
+  M5.Display.drawRoundRect(rectX, rectY, rectW, rectH, 10, TFT_BLACK);
 }
 
 void drawPatternSummaryPair(int x, int topY, int bottomY,
                             const String& pSignal, const String& hSignal, const String& lSignal,
                             bool lightActive) {
-  const int baseX = x + 86;
+  const int baseX = x + 92;
+  const int pressureX = baseX;
+  const int humidityX = baseX + 108;
+  const int lightX = baseX + 224;
+  const int pressureW = 84;
+  const int humidityW = 84;
+  const int lightW = 96;
   const String cluePressure = "DOWN";
   const String clueHumidity = "UP";
   const String clueLight = lightActive ? String("DOWN") : String("NIGHT");
 
-  drawPatternMatchHighlight(baseX, topY, bottomY, ui_text::kPatternPressure, pSignal, cluePressure);
-  drawPatternMatchHighlight(baseX + 94, topY, bottomY, ui_text::kPatternHumidity, hSignal, clueHumidity);
-  if (lightActive) {
-    drawPatternMatchHighlight(baseX + 188, topY, bottomY, ui_text::kPatternLight, lSignal, clueLight);
-  }
-
   drawPatternSummaryRow(x, topY, ui_text::kNow, pSignal, hSignal, lSignal, lightActive, false);
   drawPatternSummaryRow(x, bottomY, ui_text::kRainPattern, pSignal, hSignal, lSignal, lightActive, true);
+
+  drawPatternMatchHighlight(pressureX, pressureW, topY, bottomY, pSignal, cluePressure);
+  drawPatternMatchHighlight(humidityX, humidityW, topY, bottomY, hSignal, clueHumidity);
+  if (lightActive) {
+    drawPatternMatchHighlight(lightX, lightW, topY, bottomY, lSignal, clueLight);
+  }
 }
 
 void drawPatternSummaryRow(int x, int y, const char* heading,
                            const String& pSignal, const String& hSignal, const String& lSignal,
   bool lightActive, bool isClueRow) {
   drawUiTextLeft(heading, x, y, uiSmallFont());
-  int baseX = x + 86;
+  int baseX = x + 92;
   String cluePressure = isClueRow ? String("DOWN") : pSignal;
   String clueHumidity = isClueRow ? String("UP") : hSignal;
   String clueLight = isClueRow ? String("DOWN") : lSignal;
   drawSignalToken(baseX, y, ui_text::kPatternPressure, cluePressure);
-  drawSignalToken(baseX + 94, y, ui_text::kPatternHumidity, clueHumidity);
+  drawSignalToken(baseX + 108, y, ui_text::kPatternHumidity, clueHumidity);
   if (!isClueRow || lightActive) {
-    drawSignalToken(baseX + 188, y, ui_text::kPatternLight, lightActive ? clueLight : String("NIGHT"));
+    drawSignalToken(baseX + 224, y, ui_text::kPatternLight, lightActive ? clueLight : String("NIGHT"));
   }
 }
 
@@ -1296,8 +1392,9 @@ void drawSignalRow(const MonoIcon& icon, const char* label, const String& signal
   const int stateX = UI_MARGIN_X + 10;
   const int gaugeX = UI_MARGIN_X + 10;
   const int gaugeW = M5.Display.width() - UI_MARGIN_X * 2 - 20;
+  String strengthLabel = signalStrengthLabel(signal, gaugeValue);
   drawLabeledIcon(icon, label, labelX, y + 4);
-  drawUiTextLeft(signalGlyph(signal), stateX, y + 54, uiBodyFont());
+  drawUiTextLeft(strengthLabel, stateX, y + 54, uiBodyFont());
   drawMonoIcon(M5.Display.width() - UI_MARGIN_X - signalIcon(signal).width - 10, y + 42, signalIcon(signal), 1);
   drawUiTextRight(signalMeaning(label, signal), M5.Display.width() - UI_MARGIN_X - signalIcon(signal).width - 24, y + 54, uiSmallFont());
   drawCenteredGauge(gaugeX, y + 108, gaugeW, 22, gaugeValue);
@@ -1406,10 +1503,13 @@ void drawSlideSummaryBody() {
   String lArrow = arrowForDelta(g_luxMeta.delta);
   bool lightActive = isLightRainFactorActive();
   String lightDisplay = lightActive ? lArrow : String("NIGHT");
+  bool pressureMatch = isRainSign(ui_text::kPressure, pArrow);
+  bool humidityMatch = isRainSign(ui_text::kHumidity, hArrow);
+  bool lightMatch = lightActive && isRainSign(ui_text::kLight, lArrow);
   int rainDenom = lightActive ? 3 : 2;
-  int rainSigns = (isRainSign(ui_text::kPressure, pArrow) ? 1 : 0) +
-                  (isRainSign(ui_text::kHumidity, hArrow) ? 1 : 0) +
-                  ((lightActive && isRainSign(ui_text::kLight, lArrow)) ? 1 : 0);
+  int rainSigns = (pressureMatch ? 1 : 0) +
+                  (humidityMatch ? 1 : 0) +
+                  (lightMatch ? 1 : 0);
   String luxValue = formatFloat1(g_luxRaw.lux);
 
   drawCard(UI_MARGIN_X, currentY, cardW, currentH, ui_text::kCurrentValues);
@@ -1426,7 +1526,8 @@ void drawSlideSummaryBody() {
   char rainSignsBuf[32];
   snprintf(rainSignsBuf, sizeof(rainSignsBuf), ui_text::kRainSignsFmt, rainSigns, rainDenom);
   drawUiTextLeft(rainSignsBuf, innerX, 634, uiBodyFont());
-  drawPatternSummaryPair(innerX, 668, 704, pArrow, hArrow, lArrow, lightActive);
+  drawUiTextLeft(rainClueHint(pressureMatch, humidityMatch, lightMatch, lightActive), innerX, 662, uiSmallFont());
+  drawPatternSummaryPair(innerX, 700, 752, pArrow, hArrow, lArrow, lightActive);
 }
 
 void drawSlideSignalsBody() {
@@ -1436,10 +1537,13 @@ void drawSlideSignalsBody() {
   String lArrow = arrowForDelta(g_luxMeta.delta);
   bool lightActive = isLightRainFactorActive();
   String lightDisplay = lightActive ? lArrow : String("NIGHT");
+  bool pressureMatch = isRainSign(ui_text::kPressure, pArrow);
+  bool humidityMatch = isRainSign(ui_text::kHumidity, hArrow);
+  bool lightMatch = lightActive && isRainSign(ui_text::kLight, lArrow);
   int rainDenom = lightActive ? 3 : 2;
-  int rainSigns = (isRainSign(ui_text::kPressure, pArrow) ? 1 : 0) +
-                  (isRainSign(ui_text::kHumidity, hArrow) ? 1 : 0) +
-                  ((lightActive && isRainSign(ui_text::kLight, lArrow)) ? 1 : 0);
+  int rainSigns = (pressureMatch ? 1 : 0) +
+                  (humidityMatch ? 1 : 0) +
+                  (lightMatch ? 1 : 0);
 
   drawSignalRow(ICON_PRESSURE, ui_text::kPressure, pArrow, normalizedPressureTrend(), 88);
   drawSignalRow(ICON_HUMIDITY, ui_text::kHumidity, hArrow, normalizedHumidityTrend(), 242);
@@ -1450,9 +1554,10 @@ void drawSlideSignalsBody() {
   char rainSignsBuf[32];
   snprintf(rainSignsBuf, sizeof(rainSignsBuf), ui_text::kRainSignsFmt, rainSigns, rainDenom);
   drawUiTextLeft(rainSignsBuf, UI_MARGIN_X + 18, 608, uiBodyFont());
-  drawPatternSummaryPair(UI_MARGIN_X + 18, 644, 680, pArrow, hArrow, lArrow, lightActive);
-  drawUiTextLeft(ui_text::kWhatChangedFirst, UI_MARGIN_X + 18, 774, uiSmallFont());
-  drawUiTextRight(ui_text::kRainComing, M5.Display.width() - UI_MARGIN_X - 34, 774, uiSmallFont());
+  drawUiTextLeft(rainClueHint(pressureMatch, humidityMatch, lightMatch, lightActive), UI_MARGIN_X + 18, 636, uiSmallFont());
+  drawPatternSummaryPair(UI_MARGIN_X + 18, 676, 728, pArrow, hArrow, lArrow, lightActive);
+  drawUiTextLeft(currentSignalPrompt(), UI_MARGIN_X + 18, 784, uiSmallFont());
+  drawUiTextRight(ui_text::kRainComing, M5.Display.width() - UI_MARGIN_X - 34, 784, uiSmallFont());
 }
 
 void drawTrendGraphsBody(uint32_t targetWindowMin, const char* prompt) {
@@ -1555,6 +1660,10 @@ void drawSlideStatusBody() {
 }
 
 void renderSlide(bool fullFrame) {
+  if (g_currentSlide == 1 && fullFrame) {
+    advanceSignalPrompt();
+  }
+
   if (fullFrame) {
     drawHeaderFrame(currentSlideTitle());
     drawFooterFrame();
@@ -1580,6 +1689,7 @@ void setup() {
   Serial.begin(115200);
   delay(500);
   Serial.println("[SETUP] begin");
+  randomSeed((uint32_t)micros());
 
   auto cfg = M5.config();
   cfg.external_spk = false;
@@ -1702,7 +1812,8 @@ void loop() {
   if (g_needRedraw && (nowMs - g_lastRefreshMs >= EPD_REFRESH_MS || manualRefresh)) {
     Serial.printf("[LOOP] render slide=%u now=%lu last=%lu\n", g_currentSlide, (unsigned long)nowMs, (unsigned long)g_lastRefreshMs);
     g_renderInProgress = true;
-    bool fullFrame = manualRefresh || g_lastRenderedSlide != g_currentSlide || g_lastRenderedSlide == 255;
+    bool forceFullFrame = (g_currentSlide == 0 || g_currentSlide == 1);
+    bool fullFrame = manualRefresh || forceFullFrame || g_lastRenderedSlide != g_currentSlide || g_lastRenderedSlide == 255;
     renderSlide(fullFrame);
     Serial.println("[LOOP] render done");
     uint32_t doneMs = millis();
