@@ -23,6 +23,10 @@ The goal is to help a junior-high-school student learn how to read:
 
 and think: **"Is rain getting closer?"**
 
+Demo video:
+
+- [YouTube: System demo](https://youtu.be/j70QptzSllY)
+
 ## Current UI State
 
 - Portrait layout is the default UI
