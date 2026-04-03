@@ -174,6 +174,7 @@ bool g_needRedraw = true;
 bool g_renderInProgress = false;
 bool g_sdReady = false;
 bool g_timeValid = false;
+bool g_forceImmediateRender = false;
 uint8_t g_lastRenderedSlide = 255;
 uint8_t g_signalPromptIndex = 0;
 epd_mode_t g_currentEpdMode = epd_mode_t::epd_quality;
@@ -979,6 +980,25 @@ int scaledIconHeight(const MonoIcon& icon, int scale = 1) {
   return icon.height * scale;
 }
 
+void drawIconTextRowAligned(const MonoIcon& icon, const char* label, const String& value,
+                            int iconX, int valueRightX, int y,
+                            const lgfx::IFont* valueFont = &fonts::Font4) {
+  const int labelX = iconX + icon.width + 12;
+  drawMonoIcon(iconX, y - 4, icon, 1);
+  drawTextRowAligned(label, value, labelX, valueRightX, y, valueFont);
+}
+
+void drawIconTextRowWithComment(const MonoIcon& icon, const char* label, const String& value, const String& comment,
+                                int iconX, int valueRightX, int y,
+                                const lgfx::IFont* valueFont = &fonts::Font4,
+                                const lgfx::IFont* commentFont = nullptr) {
+  const int labelX = iconX + icon.width + 12;
+  const lgfx::IFont* noteFont = commentFont ? commentFont : uiSmallFont();
+  drawMonoIcon(iconX, y - 4, icon, 1);
+  drawTextRowAligned(label, value, labelX, valueRightX, y, valueFont);
+  drawUiTextRight(comment, valueRightX, y + M5.Display.fontHeight(valueFont) + 6, noteFont);
+}
+
 void drawLabeledIcon(const MonoIcon& icon, const char* label, int x, int y, int scale = 1) {
   drawMonoIcon(x, y, icon, scale);
   drawUiTextLeft(label, x + scaledIconWidth(icon, scale) + 10, y + 8, uiSmallFont());
@@ -1152,6 +1172,34 @@ void drawCard(int x, int y, int w, int h, const char* title) {
   M5.Display.fillRect(x + 1, y + 1, w - 2, h - 2, TFT_WHITE);
   M5.Display.drawRect(x, y, w, h, TFT_BLACK);
   drawUiTextLeft(title, x + 10, y + 10, uiSmallFont());
+}
+
+String explainStatusReason(const char* reason) {
+  if (!reason || reason[0] == '\0') return String("No special reason");
+
+  if (strcmp(reason, "periodic") == 0) {
+    return String("Sent at regular intervals");
+  }
+  if (strcmp(reason, "none") == 0) {
+    return String("No special reason");
+  }
+  if (strcmp(reason, "last_will") == 0) {
+    return String("Auto notice after the connection stopped");
+  }
+  if (strcmp(reason, "boot") == 0) {
+    return String("First notice after startup");
+  }
+  if (strcmp(reason, "reconnect") == 0) {
+    return String("Notice after reconnecting");
+  }
+  return String(reason);
+}
+
+String mqttRetryComment(uint32_t count) {
+  if (count == 0) return String("No issue");
+  if (count == 1) return String("Watch if it rises");
+  if (count <= 3) return String("Check if it keeps rising");
+  return String("Check MQTT or Wi-Fi");
 }
 
 const char* trendLabel(const char* trend) {
@@ -1634,35 +1682,41 @@ void drawSlideGraphsLongBody() {
 
 void drawSlideStatusBody() {
   const int cardW = M5.Display.width() - UI_MARGIN_X * 2;
-  const int healthX = UI_MARGIN_X + 18;
-  const int healthRight = M5.Display.width() - UI_MARGIN_X - 22;
-  const int networkX = UI_MARGIN_X + 18;
-  const int networkRight = M5.Display.width() - UI_MARGIN_X - 22;
+  const int contentLeft = UI_MARGIN_X + 24;
+  const int contentRight = M5.Display.width() - UI_MARGIN_X - 28;
+  const int healthRow1Y = 152;
+  const int healthRow2Y = 212;
+  const int healthRow3Y = 272;
+  const int networkRow1Y = 430;
+  const int networkRow2Y = 484;
+  const int networkRow3Y = 538;
+  const int networkRow4Y = 590;
+  const int networkRow5Y = 700;
 
   drawCard(UI_MARGIN_X, 92, cardW, 252, ui_text::kHealth);
-  drawMonoIcon(M5.Display.width() - UI_MARGIN_X - ICON_SENSOR.width - 6, 102, ICON_SENSOR, 1);
+  drawMonoIcon(contentRight - ICON_SENSOR.width, 110, ICON_SENSOR, 1);
   drawTextRowAligned(ui_text::kSensor, String(g_luxStatus.sensor_ready ? "READY" : "FAIL"),
-                     healthX, healthRight - 28, 170, &fonts::Font4);
+                     contentLeft, contentRight - 8, healthRow1Y, &fonts::Font4);
   drawTextRowAligned(ui_text::kStatus, String(g_luxStatus.status),
-                     healthX, healthRight - 28, 224, &fonts::Font4);
-  drawTextRowAligned(ui_text::kReason, String(g_luxStatus.reason),
-                     healthX, healthRight - 28, 278, &fonts::Font4);
+                     contentLeft, contentRight - 8, healthRow2Y, &fonts::Font4);
+  drawTextRowAligned(ui_text::kReason, explainStatusReason(g_luxStatus.reason),
+                     contentLeft, contentRight - 8, healthRow3Y,
+                     isJapaneseUi() ? uiBodyFont() : &fonts::Font4);
 
   drawCard(UI_MARGIN_X, 370, cardW, 396, ui_text::kNetwork);
-  drawMonoIcon(M5.Display.width() - UI_MARGIN_X - ICON_WIFI.width - 6, 380, ICON_WIFI, 1);
+  drawMonoIcon(contentRight - ICON_WIFI.width, 388, ICON_WIFI, 1);
   drawTextRowAligned(ui_text::kWifi, String(g_luxStatus.wifi),
-                     networkX, networkRight - 28, 444, &fonts::Font4);
+                     contentLeft, contentRight - 8, networkRow1Y, &fonts::Font4);
   drawTextRowAligned(ui_text::kIp, String(g_luxStatus.ip),
-                     networkX, networkRight - 28, 496, &fonts::Font4);
+                     contentLeft, contentRight - 8, networkRow2Y, &fonts::Font4);
   drawTextRowAligned(ui_text::kErrCnt, String(g_luxStatus.sensor_error_count),
-                     networkX, networkRight - 28, 548, &fonts::Font4);
-  drawMonoIcon(networkX, 612, ICON_MQTT, 1);
-  drawTextRowAligned(ui_text::kMqttRetry, String(g_luxStatus.mqtt_reconnect_count),
-                     networkX, networkRight - 28, 600, &fonts::Font4);
-  M5.Display.drawLine(UI_MARGIN_X + 18, 670, M5.Display.width() - UI_MARGIN_X - 18, 670, TFT_BLACK);
-  drawMonoIcon(networkX, 674, ICON_CLOCK, 1);
-  drawTextRowAligned(ui_text::kUpdated, formatUnixTime(g_luxStatus.unix_time),
-                     networkX, networkRight - 28, 698, isJapaneseUi() ? uiSmallFont() : &fonts::Font2);
+                     contentLeft, contentRight - 8, networkRow3Y, &fonts::Font4);
+  drawIconTextRowWithComment(ICON_MQTT, ui_text::kMqttRetry, String(g_luxStatus.mqtt_reconnect_count),
+                             mqttRetryComment(g_luxStatus.mqtt_reconnect_count),
+                             contentLeft, contentRight - 8, networkRow4Y, &fonts::Font4, uiSmallFont());
+  M5.Display.drawLine(contentLeft, 654, contentRight, 654, TFT_BLACK);
+  drawIconTextRowAligned(ICON_CLOCK, ui_text::kUpdated, formatUnixTime(g_luxStatus.unix_time),
+                         contentLeft, contentRight - 8, networkRow5Y, isJapaneseUi() ? uiSmallFont() : &fonts::Font2);
 
   if (strcmp(g_luxStatus.status, "ok") != 0) {
     const int warnX = 20;
@@ -1780,6 +1834,7 @@ void handleButtons() {
     }
     g_lastSlideMs = millis();
     g_needRedraw = true;
+    g_forceImmediateRender = true;
   }
   if (M5.BtnC.wasClicked()) {
     if (g_currentSlide == STATUS_SCREEN_INDEX) {
@@ -1790,8 +1845,10 @@ void handleButtons() {
     }
     g_lastSlideMs = millis();
     g_needRedraw = true;
+    g_forceImmediateRender = true;
   }
   if (M5.BtnB.wasClicked()) {
+    g_forceImmediateRender = true;
     g_needRedraw = true;  // manual refresh
   }
 
@@ -1806,11 +1863,13 @@ void handleButtons() {
       }
       g_lastSlideMs = millis();
       g_needRedraw = true;
+      g_forceImmediateRender = true;
     } else if (isStatusSwipe(touch)) {
       g_lastMainSlide = g_currentSlide;
       g_currentSlide = STATUS_SCREEN_INDEX;
       g_lastSlideMs = millis();
       g_needRedraw = true;
+      g_forceImmediateRender = true;
     }
   }
 }
@@ -1844,7 +1903,7 @@ void loop() {
     g_lastStateSaveMs = nowMs;
   }
 
-  if (g_needRedraw && (nowMs - g_lastRefreshMs >= EPD_REFRESH_MS || manualRefresh)) {
+  if (g_needRedraw && (nowMs - g_lastRefreshMs >= EPD_REFRESH_MS || manualRefresh || g_forceImmediateRender)) {
     Serial.printf("[LOOP] render slide=%u now=%lu last=%lu\n", g_currentSlide, (unsigned long)nowMs, (unsigned long)g_lastRefreshMs);
     g_renderInProgress = true;
     bool forceFullFrame = (g_currentSlide == 0 || g_currentSlide == 1);
@@ -1854,6 +1913,7 @@ void loop() {
     uint32_t doneMs = millis();
     g_lastRefreshMs = doneMs;
     g_needRedraw = false;
+    g_forceImmediateRender = false;
     g_renderInProgress = false;
     g_lastRenderedSlide = g_currentSlide;
   }

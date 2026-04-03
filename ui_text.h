@@ -94,7 +94,7 @@ static constexpr const char* kWifiOk = "WIFI OK";
 static constexpr const char* kWifiNg = "WIFI NG";
 static constexpr const char* kMqttOk = "MQTT OK";
 static constexpr const char* kMqttNg = "MQTT NG";
-static constexpr const char* kStatusButton = "ネットワーク";
+static constexpr const char* kStatusButton = "デバイス状態";
 static constexpr const char* kBackButton = "戻る";
 static constexpr const char* kBooting = "起動中...";
 
@@ -103,7 +103,7 @@ static constexpr const char* kSlide1Title = "スライド1  現在値";
 static constexpr const char* kSlide2Title = "スライド2  変化のサイン";
 static constexpr const char* kSlide3Title = "スライド3  短期傾向 (15分)";
 static constexpr const char* kSlide4Title = "スライド4  長期傾向 (120分)";
-static constexpr const char* kStatusTitle = "状態";
+static constexpr const char* kStatusTitle = "デバイス状態";
 
 // Shared labels
 static constexpr const char* kTemp = "気温";
