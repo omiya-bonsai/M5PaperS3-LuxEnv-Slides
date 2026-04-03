@@ -1157,18 +1157,24 @@ void drawSignalToken(int x, int y, const char* label, const String& signal) {
   drawMonoIcon(iconX, y - 10, signalIcon(signal), 1);
 }
 
+int patternTokenWidth(const char* label, const String& signal) {
+  const int labelW = uiTextWidth(label, uiSmallFont());
+  const int gap = 8;
+  if (signal == "NIGHT") {
+    return labelW + gap + uiTextWidth(ui_text::kNight, uiSmallFont());
+  }
+  return labelW + gap + signalIcon(signal).width;
+}
+
 void drawPatternMatchHighlight(int x, int topY, int bottomY, const char* label,
                                const String& topSignal, const String& bottomSignal) {
   if (topSignal != bottomSignal) return;
   if (topSignal == "NIGHT") return;
 
-  const MonoIcon& topIcon = signalIcon(topSignal);
-  const MonoIcon& bottomIcon = signalIcon(bottomSignal);
-  const int iconX = x + uiTextWidth(label, uiSmallFont()) + 8;
-  const int rectX = iconX - 8;
-  const int rectY = topY - 14;
-  const int rectW = max(topIcon.width, bottomIcon.width) + 16;
-  const int rectBottom = (bottomY - 10) + bottomIcon.height + 8;
+  const int rectX = x - 8;
+  const int rectY = topY - 8;
+  const int rectW = max(patternTokenWidth(label, topSignal), patternTokenWidth(label, bottomSignal)) + 16;
+  const int rectBottom = bottomY + M5.Display.fontHeight(uiSmallFont()) + 8;
   const int rectH = rectBottom - rectY;
   M5.Display.drawRoundRect(rectX, rectY, rectW, rectH, 8, TFT_BLACK);
 }
@@ -1479,7 +1485,7 @@ void drawTrendGraphsBody(uint32_t targetWindowMin, const char* prompt) {
                            startLabel, midLabel, endLabel, maxRenderPoints, drawAllMarkers);
   drawSimpleLineGraphFloat(UI_MARGIN_X, 512, M5.Display.width() - UI_MARGIN_X * 2, 188,
                            ICON_LIGHT, g_luxGraphVals, luxN, ui_text::kLux, "",
-                           startLabel, midLabel, endLabel, maxRenderPoints, drawAllMarkers, true);
+                           startLabel, midLabel, endLabel, maxRenderPoints, drawAllMarkers);
 
   M5.Display.drawLine(UI_MARGIN_X, 726, M5.Display.width() - UI_MARGIN_X, 726, TFT_BLACK);
   char nowBuf[64];
