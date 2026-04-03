@@ -1157,6 +1157,40 @@ void drawSignalToken(int x, int y, const char* label, const String& signal) {
   drawMonoIcon(iconX, y - 10, signalIcon(signal), 1);
 }
 
+void drawPatternMatchHighlight(int x, int topY, int bottomY, const char* label,
+                               const String& topSignal, const String& bottomSignal) {
+  if (topSignal != bottomSignal) return;
+  if (topSignal == "NIGHT") return;
+
+  const MonoIcon& topIcon = signalIcon(topSignal);
+  const MonoIcon& bottomIcon = signalIcon(bottomSignal);
+  const int iconX = x + uiTextWidth(label, uiSmallFont()) + 8;
+  const int rectX = iconX - 8;
+  const int rectY = topY - 14;
+  const int rectW = max(topIcon.width, bottomIcon.width) + 16;
+  const int rectBottom = (bottomY - 10) + bottomIcon.height + 8;
+  const int rectH = rectBottom - rectY;
+  M5.Display.drawRoundRect(rectX, rectY, rectW, rectH, 8, TFT_BLACK);
+}
+
+void drawPatternSummaryPair(int x, int topY, int bottomY,
+                            const String& pSignal, const String& hSignal, const String& lSignal,
+                            bool lightActive) {
+  const int baseX = x + 86;
+  const String cluePressure = "DOWN";
+  const String clueHumidity = "UP";
+  const String clueLight = lightActive ? String("DOWN") : String("NIGHT");
+
+  drawPatternMatchHighlight(baseX, topY, bottomY, ui_text::kPatternPressure, pSignal, cluePressure);
+  drawPatternMatchHighlight(baseX + 94, topY, bottomY, ui_text::kPatternHumidity, hSignal, clueHumidity);
+  if (lightActive) {
+    drawPatternMatchHighlight(baseX + 188, topY, bottomY, ui_text::kPatternLight, lSignal, clueLight);
+  }
+
+  drawPatternSummaryRow(x, topY, ui_text::kNow, pSignal, hSignal, lSignal, lightActive, false);
+  drawPatternSummaryRow(x, bottomY, ui_text::kRainPattern, pSignal, hSignal, lSignal, lightActive, true);
+}
+
 void drawPatternSummaryRow(int x, int y, const char* heading,
                            const String& pSignal, const String& hSignal, const String& lSignal,
   bool lightActive, bool isClueRow) {
@@ -1386,8 +1420,7 @@ void drawSlideSummaryBody() {
   char rainSignsBuf[32];
   snprintf(rainSignsBuf, sizeof(rainSignsBuf), ui_text::kRainSignsFmt, rainSigns, rainDenom);
   drawUiTextLeft(rainSignsBuf, innerX, 634, uiBodyFont());
-  drawPatternSummaryRow(innerX, 668, ui_text::kNow, pArrow, hArrow, lArrow, lightActive, false);
-  drawPatternSummaryRow(innerX, 704, ui_text::kRainPattern, pArrow, hArrow, lArrow, lightActive, true);
+  drawPatternSummaryPair(innerX, 668, 704, pArrow, hArrow, lArrow, lightActive);
 }
 
 void drawSlideSignalsBody() {
@@ -1411,8 +1444,7 @@ void drawSlideSignalsBody() {
   char rainSignsBuf[32];
   snprintf(rainSignsBuf, sizeof(rainSignsBuf), ui_text::kRainSignsFmt, rainSigns, rainDenom);
   drawUiTextLeft(rainSignsBuf, UI_MARGIN_X + 18, 608, uiBodyFont());
-  drawPatternSummaryRow(UI_MARGIN_X + 18, 644, ui_text::kNow, pArrow, hArrow, lArrow, lightActive, false);
-  drawPatternSummaryRow(UI_MARGIN_X + 18, 680, ui_text::kRainPattern, pArrow, hArrow, lArrow, lightActive, true);
+  drawPatternSummaryPair(UI_MARGIN_X + 18, 644, 680, pArrow, hArrow, lArrow, lightActive);
   drawUiTextLeft(ui_text::kWhatChangedFirst, UI_MARGIN_X + 18, 774, uiSmallFont());
   drawUiTextRight(ui_text::kRainComing, M5.Display.width() - UI_MARGIN_X - 34, 774, uiSmallFont());
 }
