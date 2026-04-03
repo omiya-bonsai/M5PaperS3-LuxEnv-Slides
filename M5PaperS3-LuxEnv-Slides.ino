@@ -176,6 +176,7 @@ bool g_sdReady = false;
 bool g_timeValid = false;
 uint8_t g_lastRenderedSlide = 255;
 uint8_t g_signalPromptIndex = 0;
+epd_mode_t g_currentEpdMode = epd_mode_t::epd_quality;
 
 static constexpr const char* kSignalPromptsJa[] = {
   "3つの変化はそろっているかな？",
@@ -1676,7 +1677,24 @@ void drawSlideStatusBody() {
   }
 }
 
+epd_mode_t desiredEpdModeForSlide(uint8_t slideIndex) {
+  switch (slideIndex) {
+    case 0:
+    case 1:
+    case STATUS_SCREEN_INDEX:
+      return epd_mode_t::epd_text;
+    default:
+      return epd_mode_t::epd_quality;
+  }
+}
+
 void renderSlide(bool fullFrame) {
+  epd_mode_t nextMode = desiredEpdModeForSlide(g_currentSlide);
+  if (g_currentEpdMode != nextMode) {
+    M5.Display.setEpdMode(nextMode);
+    g_currentEpdMode = nextMode;
+  }
+
   if (g_currentSlide == 1 && fullFrame) {
     advanceSignalPrompt();
   }
@@ -1719,7 +1737,7 @@ void setup() {
   M5.update();
   Serial.println("[SETUP] display rotation done");
 
-  M5.Display.setEpdMode(epd_mode_t::epd_quality);
+  M5.Display.setEpdMode(g_currentEpdMode);
   Serial.println("[SETUP] EPD mode set");
 
   M5.Display.fillScreen(TFT_WHITE);
