@@ -254,6 +254,13 @@ String arrowForDelta(float v) {
   return "FLAT";
 }
 
+String signalForNormalizedTrend(float normalized) {
+  if (isnan(normalized)) return "?";
+  if (normalized > SIGNAL_STEADY_DEADZONE) return "UP";
+  if (normalized < -SIGNAL_STEADY_DEADZONE) return "DOWN";
+  return "FLAT";
+}
+
 float safeLatestTs() {
   if (g_luxRaw.valid && g_luxRaw.unix_time > 0) return g_luxRaw.unix_time;
   if (g_env4.valid && g_env4.ts > 0) return g_env4.ts;
@@ -1504,9 +1511,12 @@ void drawSlideSummaryBody() {
   const int leftUnitX = innerX + 108;
   const int rightUnitX = rightColX + 164;
 
-  String pArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).pressure - g_envHist.at(0).pressure : NAN);
-  String hArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).humidity - g_envHist.at(0).humidity : NAN);
-  String lArrow = arrowForDelta(g_luxMeta.delta);
+  float pressureTrend = normalizedPressureTrend();
+  float humidityTrend = normalizedHumidityTrend();
+  float luxTrend = normalizedLuxTrend();
+  String pArrow = signalForNormalizedTrend(pressureTrend);
+  String hArrow = signalForNormalizedTrend(humidityTrend);
+  String lArrow = signalForNormalizedTrend(luxTrend);
   bool lightActive = isLightRainFactorActive();
   String lightDisplay = lightActive ? lArrow : String("NIGHT");
   bool pressureMatch = isRainSign(ui_text::kPressure, pArrow);
@@ -1537,10 +1547,12 @@ void drawSlideSummaryBody() {
 }
 
 void drawSlideSignalsBody() {
-
-  String pArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).pressure - g_envHist.at(0).pressure : NAN);
-  String hArrow = arrowForDelta(g_envHist.count >= 2 ? g_envHist.at(g_envHist.count - 1).humidity - g_envHist.at(0).humidity : NAN);
-  String lArrow = arrowForDelta(g_luxMeta.delta);
+  float pressureTrend = normalizedPressureTrend();
+  float humidityTrend = normalizedHumidityTrend();
+  float luxTrend = normalizedLuxTrend();
+  String pArrow = signalForNormalizedTrend(pressureTrend);
+  String hArrow = signalForNormalizedTrend(humidityTrend);
+  String lArrow = signalForNormalizedTrend(luxTrend);
   bool lightActive = isLightRainFactorActive();
   String lightDisplay = lightActive ? lArrow : String("NIGHT");
   bool pressureMatch = isRainSign(ui_text::kPressure, pArrow);
@@ -1551,9 +1563,9 @@ void drawSlideSignalsBody() {
                   (humidityMatch ? 1 : 0) +
                   (lightMatch ? 1 : 0);
 
-  drawSignalRow(ICON_PRESSURE, ui_text::kPressure, pArrow, normalizedPressureTrend(), 88);
-  drawSignalRow(ICON_HUMIDITY, ui_text::kHumidity, hArrow, normalizedHumidityTrend(), 242);
-  drawSignalRow(ICON_LIGHT, ui_text::kLight, lightDisplay, lightActive ? normalizedLuxTrend() : 0.0f, 396);
+  drawSignalRow(ICON_PRESSURE, ui_text::kPressure, pArrow, pressureTrend, 88);
+  drawSignalRow(ICON_HUMIDITY, ui_text::kHumidity, hArrow, humidityTrend, 242);
+  drawSignalRow(ICON_LIGHT, ui_text::kLight, lightDisplay, lightActive ? luxTrend : 0.0f, 396);
 
   drawCard(UI_MARGIN_X, 544, M5.Display.width() - UI_MARGIN_X * 2, 278, ui_text::kInterpret);
   char rainSignsBuf[32];
