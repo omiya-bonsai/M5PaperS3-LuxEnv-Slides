@@ -56,10 +56,13 @@ static constexpr const char* kBuild = "BUILD";
 static constexpr const char* kRepoQr = "GitHub QR";
 static constexpr const char* kWifiState = "WIFI";
 static constexpr const char* kMqttState = "MQTT";
+static constexpr const char* kPower = "POWER";
 static constexpr const char* kConnected = "CONNECTED";
 static constexpr const char* kDisconnected = "DISCONNECTED";
 static constexpr const char* kDeviceScopeLine1 = "This screen shows the PaperS3 itself.";
 static constexpr const char* kDeviceScopeLine2 = "Use the footer buttons to switch screens.";
+static constexpr const char* kChargingNow = "USB POWER";
+static constexpr const char* kRuntimePrefix = "EST.";
 
 // State / meaning words
 static constexpr const char* kNoData = "NO DATA";
@@ -153,10 +156,13 @@ static constexpr const char* kBuild = "ビルド日時";
 static constexpr const char* kRepoQr = "GitHub QR";
 static constexpr const char* kWifiState = "Wi-Fi";
 static constexpr const char* kMqttState = "MQTT";
+static constexpr const char* kPower = "電源";
 static constexpr const char* kConnected = "接続中";
 static constexpr const char* kDisconnected = "未接続";
 static constexpr const char* kDeviceScopeLine1 = "この画面は PaperS3 本体の情報を表示します";
 static constexpr const char* kDeviceScopeLine2 = "フッターのボタンで画面を切り替えできます";
+static constexpr const char* kChargingNow = "給電中";
+static constexpr const char* kRuntimePrefix = "推定";
 
 // State / meaning words
 static constexpr const char* kNoData = "データなし";
@@ -249,10 +255,13 @@ static constexpr const char* kBuild = UI_TEXT_SELECT(kBuild);
 static constexpr const char* kRepoQr = UI_TEXT_SELECT(kRepoQr);
 static constexpr const char* kWifiState = UI_TEXT_SELECT(kWifiState);
 static constexpr const char* kMqttState = UI_TEXT_SELECT(kMqttState);
+static constexpr const char* kPower = UI_TEXT_SELECT(kPower);
 static constexpr const char* kConnected = UI_TEXT_SELECT(kConnected);
 static constexpr const char* kDisconnected = UI_TEXT_SELECT(kDisconnected);
 static constexpr const char* kDeviceScopeLine1 = UI_TEXT_SELECT(kDeviceScopeLine1);
 static constexpr const char* kDeviceScopeLine2 = UI_TEXT_SELECT(kDeviceScopeLine2);
+static constexpr const char* kChargingNow = UI_TEXT_SELECT(kChargingNow);
+static constexpr const char* kRuntimePrefix = UI_TEXT_SELECT(kRuntimePrefix);
 
 static constexpr const char* kNoData = UI_TEXT_SELECT(kNoData);
 static constexpr const char* kNight = UI_TEXT_SELECT(kNight);
