@@ -1981,6 +1981,8 @@ void drawSlideDeviceInfoBody() {
   const int qrDrawY = qrY + 28;
   M5.Display.fillRect(qrDrawX, qrDrawY, qrSize, qrSize, TFT_WHITE);
   M5.Display.qrcode(REPOSITORY_URL, qrDrawX, qrDrawY, qrSize, 6);
+  drawUiTextCenter("github.com/omiya-bonsai", M5.Display.width() / 2, qrDrawY + qrSize + 18, uiSmallFont());
+  drawUiTextCenter("/M5PaperS3-LuxEnv-Slides", M5.Display.width() / 2, qrDrawY + qrSize + 44, uiSmallFont());
 }
 
 epd_mode_t desiredEpdModeForSlide(uint8_t slideIndex) {
