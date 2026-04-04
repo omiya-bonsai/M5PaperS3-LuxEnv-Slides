@@ -32,7 +32,7 @@ Demo video:
 - Portrait layout is the default UI
 - English and Japanese UI can be switched from `config.h`
 - Main loop uses four teaching slides
-- Network/status is a secondary screen opened from the footer button
+- Sender status is a secondary screen opened from the footer button
 - Monochrome icons are stored in `icons.h` and currently rendered at `32x32`
 - Same-slide updates reuse header/footer framing and redraw the slide body only
 
@@ -41,6 +41,7 @@ Demo video:
 Subscribed topics:
 
 - `env4`
+- `home/env/env4/status`
 - `home/env/lux/raw`
 - `home/env/lux/meta`
 - `home/env/lux/status`
@@ -115,17 +116,18 @@ Purpose:
 
 - "Is the trend continuing?"
 
-### Network Screen
+### Sender Status Screen
 
 Opened from the footer button or upward swipe.
 
 Shows:
 
-- sensor state
-- Wi-Fi state
-- IP address
-- retry / error counts
-- updated time
+- ENV4 sender status
+- lux sender status
+- sender Wi-Fi / IP
+- sender retry / error counts
+- last received time
+- footer note that footer `WIFI / MQTT` belongs to the PaperS3 itself
 
 ## UI Notes
 
@@ -140,9 +142,9 @@ Shows:
 ## Navigation
 
 - normal loop: Slide 1 -> Slide 2 -> Slide 3 -> Slide 4
-- footer center button: open `Network`
-- footer center button on network screen: back
-- upward swipe from bottom area: open `Network`
+- footer center button: open `Sender Status`
+- footer center button on sender status screen: back
+- upward swipe from bottom area: open `Sender Status`
 
 ## Required Files
 

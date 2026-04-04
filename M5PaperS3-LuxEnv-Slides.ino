@@ -1754,20 +1754,18 @@ void drawSlideGraphsLongBody() {
 }
 
 template <typename T>
-void drawSenderStatusCard(const char* title, const MonoIcon& headerIcon, const T& status,
-                          int x, int y, int w, int h) {
+void drawSenderStatusCard(const char* title, const T& status, int x, int y, int w, int h) {
   const int left = x + 18;
   const int right = x + w - 20;
-  const int row1 = y + 60;
-  const int row2 = y + 98;
-  const int row3 = y + 136;
-  const int row4 = y + 174;
-  const int row5 = y + 212;
-  const int row6 = y + 250;
-  const int row7 = y + 292;
+  const int row1 = y + 52;
+  const int row2 = y + 88;
+  const int row3 = y + 124;
+  const int row4 = y + 160;
+  const int row5 = y + 196;
+  const int row6 = y + 232;
+  const int row7 = y + 262;
 
   drawCard(x, y, w, h, title);
-  drawMonoIcon(right - headerIcon.width, y + 10, headerIcon, 1);
 
   drawTextRowAligned(ui_text::kSensor, String(status.sensor_ready ? "READY" : "FAIL"),
                      left, right - 4, row1, &fonts::Font4);
@@ -1775,23 +1773,21 @@ void drawSenderStatusCard(const char* title, const MonoIcon& headerIcon, const T
                      left, right - 4, row2, &fonts::Font4);
   drawTextRowAligned(ui_text::kReason, explainStatusReason(status.reason),
                      left, right - 4, row3,
-                     isJapaneseUi() ? uiBodyFont() : &fonts::Font4);
+                     uiSmallFont());
   drawTextRowAligned(ui_text::kWifi, String(status.wifi),
                      left, right - 4, row4, &fonts::Font4);
   drawTextRowAligned(ui_text::kIp, String(status.ip),
                      left, right - 4, row5, &fonts::Font4);
-  drawTextRowWithComment(ui_text::kErrCnt, String(status.sensor_error_count),
-                         sensorErrorComment(status.sensor_error_count),
-                         left, right - 4, row6, &fonts::Font4, uiSmallFont());
+  drawTextRowAligned(ui_text::kErrCnt, String(status.sensor_error_count),
+                     left, right - 4, row6, &fonts::Font4);
 
   uint32_t mqttRetryCount = effectiveMqttRetryCount(status.mqtt_reconnect_count);
-  drawIconTextRowWithComment(ICON_MQTT, ui_text::kMqttRetry, String(mqttRetryCount),
-                             mqttRetryComment(mqttRetryCount),
-                             left, right - 4, row7, &fonts::Font4, uiSmallFont());
+  drawTextRowAligned(ui_text::kMqttRetry, String(mqttRetryCount),
+                     left, right - 4, row7, &fonts::Font4);
 
-  M5.Display.drawLine(left, y + h - 54, right, y + h - 54, TFT_BLACK);
-  drawIconTextRowAligned(ICON_CLOCK, ui_text::kUpdated, formatUnixTime(status.unix_time),
-                         left, right - 4, y + h - 40, isJapaneseUi() ? uiSmallFont() : &fonts::Font2);
+  M5.Display.drawLine(left, y + h - 46, right, y + h - 46, TFT_BLACK);
+  drawTextRowAligned(ui_text::kUpdated, formatUnixTime(status.unix_time),
+                     left, right - 4, y + h - 30, &fonts::Font2);
 }
 
 void drawSlideStatusBody() {
@@ -1799,14 +1795,14 @@ void drawSlideStatusBody() {
   const int scopeY1 = 78;
   const int scopeY2 = 100;
   const int env4CardY = 126;
-  const int luxCardY = 504;
-  const int cardH = 344;
+  const int luxCardY = 500;
+  const int cardH = 360;
 
   drawUiTextLeft(statusScreenScopeLine1(), UI_MARGIN_X + 8, scopeY1, uiSmallFont());
   drawUiTextLeft(statusScreenScopeLine2(), UI_MARGIN_X + 8, scopeY2, uiSmallFont());
 
-  drawSenderStatusCard(env4SenderTitle(), ICON_SENSOR, g_env4Status, UI_MARGIN_X, env4CardY, cardW, cardH);
-  drawSenderStatusCard(luxSenderTitle(), ICON_LIGHT, g_luxStatus, UI_MARGIN_X, luxCardY, cardW, cardH);
+  drawSenderStatusCard(env4SenderTitle(), g_env4Status, UI_MARGIN_X, env4CardY, cardW, cardH);
+  drawSenderStatusCard(luxSenderTitle(), g_luxStatus, UI_MARGIN_X, luxCardY, cardW, cardH);
 
   if (strcmp(g_luxStatus.status, "ok") != 0) {
     const int warnX = 20;

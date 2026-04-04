@@ -16,6 +16,25 @@
 - `uptime_s`
 - `time_valid`
 
+### `home/env/env4/status`
+
+屋外環境センサ送信側の状態監視トピック。
+
+主な項目:
+
+- `status`
+- `reason`
+- `wifi`
+- `ip`
+- `sensor_ready`
+- `sensor_error_count`
+- `wifi_reconnect_count`
+- `mqtt_reconnect_count`
+- `uptime_s`
+- `seq`
+- `unix_time`
+- `time_valid`
+
 ### `home/env/lux/raw`
 
 現在照度の軽量トピック。
@@ -71,6 +90,12 @@
 {"id":"env4","ts":1775016349,"temperature":16.34,"humidity":75.73,"pressure":1011.95,"seq":5741,"uptime_s":172329,"time_valid":1}
 ```
 
+### `home/env/env4/status`
+
+```json
+{"status":"ok","reason":"periodic","wifi":"connected","ip":"192.168.0.232","sensor_ready":true,"sensor_error_count":0,"wifi_reconnect_count":0,"mqtt_reconnect_count":0,"uptime_s":172329,"seq":12,"unix_time":1775016349,"time_valid":true}
+```
+
 ### `home/env/lux/raw`
 
 ```json
@@ -101,7 +126,7 @@
 
 - `env4` と `lux_meta` はグラフ履歴用リングバッファへ格納
 - `lux_raw` は現在照度表示用
-- `lux_status` は補助の status 画面用
+- `env4_status` と `lux_status` はフッターから入る `送信機状態` 画面用
 
 ### SDカード
 
