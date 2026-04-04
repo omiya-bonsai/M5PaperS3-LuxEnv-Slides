@@ -206,10 +206,13 @@ uint8_t g_signalPromptIndex = 0;
 epd_mode_t g_currentEpdMode = epd_mode_t::epd_quality;
 static constexpr size_t BOOT_LOG_MAX_LINES = 12;
 static constexpr uint32_t BOOT_LOG_MIN_MS = 3000;
+static constexpr uint32_t BOOT_LOG_RENDER_MS = 350;
 String g_bootLogLines[BOOT_LOG_MAX_LINES];
 size_t g_bootLogCount = 0;
 bool g_bootLogScreenActive = false;
 uint32_t g_bootLogActivatedMs = 0;
+uint32_t g_lastBootLogRenderMs = 0;
+bool g_bootLogRenderPending = false;
 
 static constexpr const char* kSignalPromptsJa[] = {
   "3つの変化はそろっているかな？",
@@ -1264,10 +1267,31 @@ void drawBootLogScreen() {
   }
 }
 
+void flushBootLogScreen(bool force = false) {
+  if (!g_bootLogScreenActive) return;
+  if (!force) {
+    if (M5.Display.displayBusy()) return;
+    uint32_t nowMs = millis();
+    if (nowMs - g_lastBootLogRenderMs < BOOT_LOG_RENDER_MS) {
+      g_bootLogRenderPending = true;
+      return;
+    }
+  } else {
+    M5.Display.waitDisplay();
+  }
+
+  drawBootLogScreen();
+  M5.Display.display();
+  g_lastBootLogRenderMs = millis();
+  g_bootLogRenderPending = false;
+}
+
 void activateBootLogScreen() {
   g_bootLogScreenActive = true;
   g_bootLogActivatedMs = millis();
-  drawBootLogScreen();
+  g_lastBootLogRenderMs = 0;
+  g_bootLogRenderPending = true;
+  flushBootLogScreen(true);
 }
 
 bool shouldLeaveBootLogScreen() {
@@ -1282,7 +1306,9 @@ void logBootLine(const String& line) {
   Serial.println(line);
   appendBootLogLine(line);
   if (g_bootLogScreenActive) {
-    drawBootLogScreen();
+    g_bootLogRenderPending = true;
+    bool force = line.indexOf("ready") >= 0 || line.indexOf("SD.begin") >= 0;
+    flushBootLogScreen(force);
   }
 }
 
@@ -2217,6 +2243,9 @@ void loop() {
   }
 
   if (g_bootLogScreenActive) {
+    if (g_bootLogRenderPending) {
+      flushBootLogScreen(false);
+    }
     if (!shouldLeaveBootLogScreen()) {
       delay(20);
       return;
