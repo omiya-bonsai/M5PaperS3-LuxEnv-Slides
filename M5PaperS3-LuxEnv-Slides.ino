@@ -14,6 +14,7 @@
 // M5PaperS3 MQTT Slide Dashboard
 // - Subscribes:
 //     env4
+//     home/env/env4/status
 //     home/env/lux/raw
 //     home/env/lux/meta
 //     home/env/lux/status
@@ -26,6 +27,7 @@
 
 // ---------------------- MQTT topics --------------------------
 static constexpr const char* TOPIC_ENV4        = "env4";
+static constexpr const char* TOPIC_ENV4_STATUS = "home/env/env4/status";
 static constexpr const char* TOPIC_LUX_RAW     = "home/env/lux/raw";
 static constexpr const char* TOPIC_LUX_META    = "home/env/lux/meta";
 static constexpr const char* TOPIC_LUX_STATUS  = "home/env/lux/status";
@@ -100,6 +102,22 @@ struct LuxStatusData {
   bool valid = false;
 };
 
+struct Env4StatusData {
+  char status[16] = "unknown";
+  char reason[32] = "none";
+  char wifi[16] = "unknown";
+  char ip[32] = "0.0.0.0";
+  bool sensor_ready = false;
+  uint32_t sensor_error_count = 0;
+  uint32_t wifi_reconnect_count = 0;
+  uint32_t mqtt_reconnect_count = 0;
+  uint32_t uptime_s = 0;
+  uint32_t seq = 0;
+  uint32_t unix_time = 0;
+  bool time_valid = false;
+  bool valid = false;
+};
+
 template <typename T, size_t N>
 struct RingBuffer {
   T data[N];
@@ -144,6 +162,7 @@ Env4Data g_env4;
 LuxRawData g_luxRaw;
 LuxMetaData g_luxMeta;
 LuxStatusData g_luxStatus;
+Env4StatusData g_env4Status;
 
 RingBuffer<PointEnv, HISTORY_CAP> g_envHist;
 RingBuffer<PointLux, HISTORY_CAP> g_luxHist;
@@ -603,6 +622,7 @@ void ensureMqttConnected() {
   if (!mqttConnect()) return;
 
   mqttClient.subscribe(TOPIC_ENV4);
+  mqttClient.subscribe(TOPIC_ENV4_STATUS);
   mqttClient.subscribe(TOPIC_LUX_RAW);
   mqttClient.subscribe(TOPIC_LUX_META);
   mqttClient.subscribe(TOPIC_LUX_STATUS);
@@ -692,27 +712,38 @@ void handleLuxMeta(const JsonDocument& doc) {
   g_needRedraw = true;
 }
 
+template <typename T>
+void parseSenderStatusPayload(T& out, const JsonDocument& doc) {
+  strlcpy(out.status, doc["status"] | "unknown", sizeof(out.status));
+  strlcpy(out.reason, doc["reason"] | "none", sizeof(out.reason));
+  strlcpy(out.wifi, doc["wifi"] | "unknown", sizeof(out.wifi));
+  strlcpy(out.ip, doc["ip"] | "0.0.0.0", sizeof(out.ip));
+  out.sensor_ready = doc["sensor_ready"] | false;
+  out.sensor_error_count = doc["sensor_error_count"] | 0;
+  out.wifi_reconnect_count = doc["wifi_reconnect_count"] | 0;
+  out.mqtt_reconnect_count = doc["mqtt_reconnect_count"] | 0;
+  out.uptime_s = doc["uptime_s"] | 0;
+  out.seq = doc["seq"] | 0;
+  out.unix_time = doc["unix_time"] | 0;
+  out.time_valid = doc["time_valid"] | false;
+  out.valid = true;
+}
+
 void handleLuxStatus(const JsonDocument& doc) {
-  strlcpy(g_luxStatus.status, doc["status"] | "unknown", sizeof(g_luxStatus.status));
-  strlcpy(g_luxStatus.reason, doc["reason"] | "none", sizeof(g_luxStatus.reason));
-  strlcpy(g_luxStatus.wifi, doc["wifi"] | "unknown", sizeof(g_luxStatus.wifi));
-  strlcpy(g_luxStatus.ip, doc["ip"] | "0.0.0.0", sizeof(g_luxStatus.ip));
-  g_luxStatus.sensor_ready = doc["sensor_ready"] | false;
-  g_luxStatus.sensor_error_count = doc["sensor_error_count"] | 0;
-  g_luxStatus.wifi_reconnect_count = doc["wifi_reconnect_count"] | 0;
-  g_luxStatus.mqtt_reconnect_count = doc["mqtt_reconnect_count"] | 0;
-  g_luxStatus.uptime_s = doc["uptime_s"] | 0;
-  g_luxStatus.seq = doc["seq"] | 0;
-  g_luxStatus.unix_time = doc["unix_time"] | 0;
-  g_luxStatus.time_valid = doc["time_valid"] | false;
-  g_luxStatus.valid = true;
+  parseSenderStatusPayload(g_luxStatus, doc);
   noteLiveDisplayTime(g_luxStatus.unix_time, g_luxStatus.time_valid);
+  g_needRedraw = true;
+}
+
+void handleEnv4Status(const JsonDocument& doc) {
+  parseSenderStatusPayload(g_env4Status, doc);
+  noteLiveDisplayTime(g_env4Status.unix_time, g_env4Status.time_valid);
   g_needRedraw = true;
 }
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   Serial.printf("[MQTT] topic=%s len=%u\n", topic, length);
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<1536> doc;
   DeserializationError err = deserializeJson(doc, payload, length);
   if (err) {
     Serial.printf("[MQTT] json error: %s\n", err.c_str());
@@ -721,6 +752,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
   if (strcmp(topic, TOPIC_ENV4) == 0) {
     handleEnv4(doc);
+  } else if (strcmp(topic, TOPIC_ENV4_STATUS) == 0) {
+    handleEnv4Status(doc);
   } else if (strcmp(topic, TOPIC_LUX_RAW) == 0) {
     handleLuxRaw(doc);
   } else if (strcmp(topic, TOPIC_LUX_META) == 0) {
@@ -939,6 +972,15 @@ void drawTextRowAligned(const char* label, const String& value, int labelX, int 
   } else {
     M5.Display.drawRightString(value, valueRightX, y, valueFont);
   }
+}
+
+void drawTextRowWithComment(const char* label, const String& value, const String& comment,
+                            int labelX, int valueRightX, int y,
+                            const lgfx::IFont* valueFont = &fonts::Font4,
+                            const lgfx::IFont* commentFont = nullptr) {
+  const lgfx::IFont* noteFont = commentFont ? commentFont : uiSmallFont();
+  drawTextRowAligned(label, value, labelX, valueRightX, y, valueFont);
+  drawUiTextRight(comment, valueRightX, y + M5.Display.fontHeight(valueFont) + 6, noteFont);
 }
 
 void drawSummaryRow(const char* label, const String& value, int x, int y) {
@@ -1195,11 +1237,42 @@ String explainStatusReason(const char* reason) {
   return String(reason);
 }
 
+uint32_t effectiveMqttRetryCount(uint32_t rawCount) {
+  // The publisher appears to count the first successful MQTT connect as 1.
+  // For the UI, hide that initial connect and show only retries after it.
+  return rawCount > 0 ? (rawCount - 1) : 0;
+}
+
 String mqttRetryComment(uint32_t count) {
-  if (count == 0) return String("No issue");
+  if (count == 0) return String("Stable so far");
   if (count == 1) return String("Watch if it rises");
   if (count <= 3) return String("Check if it keeps rising");
-  return String("Check MQTT or Wi-Fi");
+  return String("Check sender MQTT/Wi-Fi");
+}
+
+String sensorErrorComment(uint32_t count) {
+  if (count == 0) return String("No sensor error");
+  if (count == 1) return String("Watch for another error");
+  if (count <= 3) return String("Check if errors repeat");
+  return String("Check sensor or wiring");
+}
+
+const char* statusScreenScopeLine1() {
+  return isJapaneseUi() ? "この画面は ENV4 と明るさ送信機の状態を並べて表示します"
+                        : "This screen compares the ENV4 and lux senders.";
+}
+
+const char* statusScreenScopeLine2() {
+  return isJapaneseUi() ? "フッター右の WIFI / MQTT は、この表示本体の通信状態です"
+                        : "Footer WIFI/MQTT shows this display device.";
+}
+
+const char* env4SenderTitle() {
+  return isJapaneseUi() ? "ENV4送信機" : "ENV4 SENDER";
+}
+
+const char* luxSenderTitle() {
+  return isJapaneseUi() ? "明るさ送信機" : "LUX SENDER";
 }
 
 const char* trendLabel(const char* trend) {
@@ -1680,43 +1753,60 @@ void drawSlideGraphsLongBody() {
   drawTrendGraphsBody(LONG_WINDOW_MIN, ui_text::kLongPrompt);
 }
 
+template <typename T>
+void drawSenderStatusCard(const char* title, const MonoIcon& headerIcon, const T& status,
+                          int x, int y, int w, int h) {
+  const int left = x + 18;
+  const int right = x + w - 20;
+  const int row1 = y + 60;
+  const int row2 = y + 98;
+  const int row3 = y + 136;
+  const int row4 = y + 174;
+  const int row5 = y + 212;
+  const int row6 = y + 250;
+  const int row7 = y + 292;
+
+  drawCard(x, y, w, h, title);
+  drawMonoIcon(right - headerIcon.width, y + 10, headerIcon, 1);
+
+  drawTextRowAligned(ui_text::kSensor, String(status.sensor_ready ? "READY" : "FAIL"),
+                     left, right - 4, row1, &fonts::Font4);
+  drawTextRowAligned(ui_text::kStatus, String(status.status),
+                     left, right - 4, row2, &fonts::Font4);
+  drawTextRowAligned(ui_text::kReason, explainStatusReason(status.reason),
+                     left, right - 4, row3,
+                     isJapaneseUi() ? uiBodyFont() : &fonts::Font4);
+  drawTextRowAligned(ui_text::kWifi, String(status.wifi),
+                     left, right - 4, row4, &fonts::Font4);
+  drawTextRowAligned(ui_text::kIp, String(status.ip),
+                     left, right - 4, row5, &fonts::Font4);
+  drawTextRowWithComment(ui_text::kErrCnt, String(status.sensor_error_count),
+                         sensorErrorComment(status.sensor_error_count),
+                         left, right - 4, row6, &fonts::Font4, uiSmallFont());
+
+  uint32_t mqttRetryCount = effectiveMqttRetryCount(status.mqtt_reconnect_count);
+  drawIconTextRowWithComment(ICON_MQTT, ui_text::kMqttRetry, String(mqttRetryCount),
+                             mqttRetryComment(mqttRetryCount),
+                             left, right - 4, row7, &fonts::Font4, uiSmallFont());
+
+  M5.Display.drawLine(left, y + h - 54, right, y + h - 54, TFT_BLACK);
+  drawIconTextRowAligned(ICON_CLOCK, ui_text::kUpdated, formatUnixTime(status.unix_time),
+                         left, right - 4, y + h - 40, isJapaneseUi() ? uiSmallFont() : &fonts::Font2);
+}
+
 void drawSlideStatusBody() {
   const int cardW = M5.Display.width() - UI_MARGIN_X * 2;
-  const int contentLeft = UI_MARGIN_X + 24;
-  const int contentRight = M5.Display.width() - UI_MARGIN_X - 28;
-  const int healthRow1Y = 152;
-  const int healthRow2Y = 212;
-  const int healthRow3Y = 272;
-  const int networkRow1Y = 430;
-  const int networkRow2Y = 484;
-  const int networkRow3Y = 538;
-  const int networkRow4Y = 590;
-  const int networkRow5Y = 700;
+  const int scopeY1 = 78;
+  const int scopeY2 = 100;
+  const int env4CardY = 126;
+  const int luxCardY = 504;
+  const int cardH = 344;
 
-  drawCard(UI_MARGIN_X, 92, cardW, 252, ui_text::kHealth);
-  drawMonoIcon(contentRight - ICON_SENSOR.width, 110, ICON_SENSOR, 1);
-  drawTextRowAligned(ui_text::kSensor, String(g_luxStatus.sensor_ready ? "READY" : "FAIL"),
-                     contentLeft, contentRight - 8, healthRow1Y, &fonts::Font4);
-  drawTextRowAligned(ui_text::kStatus, String(g_luxStatus.status),
-                     contentLeft, contentRight - 8, healthRow2Y, &fonts::Font4);
-  drawTextRowAligned(ui_text::kReason, explainStatusReason(g_luxStatus.reason),
-                     contentLeft, contentRight - 8, healthRow3Y,
-                     isJapaneseUi() ? uiBodyFont() : &fonts::Font4);
+  drawUiTextLeft(statusScreenScopeLine1(), UI_MARGIN_X + 8, scopeY1, uiSmallFont());
+  drawUiTextLeft(statusScreenScopeLine2(), UI_MARGIN_X + 8, scopeY2, uiSmallFont());
 
-  drawCard(UI_MARGIN_X, 370, cardW, 396, ui_text::kNetwork);
-  drawMonoIcon(contentRight - ICON_WIFI.width, 388, ICON_WIFI, 1);
-  drawTextRowAligned(ui_text::kWifi, String(g_luxStatus.wifi),
-                     contentLeft, contentRight - 8, networkRow1Y, &fonts::Font4);
-  drawTextRowAligned(ui_text::kIp, String(g_luxStatus.ip),
-                     contentLeft, contentRight - 8, networkRow2Y, &fonts::Font4);
-  drawTextRowAligned(ui_text::kErrCnt, String(g_luxStatus.sensor_error_count),
-                     contentLeft, contentRight - 8, networkRow3Y, &fonts::Font4);
-  drawIconTextRowWithComment(ICON_MQTT, ui_text::kMqttRetry, String(g_luxStatus.mqtt_reconnect_count),
-                             mqttRetryComment(g_luxStatus.mqtt_reconnect_count),
-                             contentLeft, contentRight - 8, networkRow4Y, &fonts::Font4, uiSmallFont());
-  M5.Display.drawLine(contentLeft, 654, contentRight, 654, TFT_BLACK);
-  drawIconTextRowAligned(ICON_CLOCK, ui_text::kUpdated, formatUnixTime(g_luxStatus.unix_time),
-                         contentLeft, contentRight - 8, networkRow5Y, isJapaneseUi() ? uiSmallFont() : &fonts::Font2);
+  drawSenderStatusCard(env4SenderTitle(), ICON_SENSOR, g_env4Status, UI_MARGIN_X, env4CardY, cardW, cardH);
+  drawSenderStatusCard(luxSenderTitle(), ICON_LIGHT, g_luxStatus, UI_MARGIN_X, luxCardY, cardW, cardH);
 
   if (strcmp(g_luxStatus.status, "ok") != 0) {
     const int warnX = 20;

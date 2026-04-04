@@ -36,16 +36,16 @@ static constexpr const char* kLight = "LIGHT";
 static constexpr const char* kCurrentValues = "CURRENT VALUES";
 static constexpr const char* kRecentChanges = "RECENT CHANGES";
 static constexpr const char* kInterpret = "INTERPRET";
-static constexpr const char* kHealth = "HEALTH";
-static constexpr const char* kNetwork = "NETWORK";
-static constexpr const char* kSensor = "SENSOR";
-static constexpr const char* kStatus = "STATUS";
-static constexpr const char* kReason = "REASON";
-static constexpr const char* kWifi = "WIFI";
-static constexpr const char* kIp = "IP";
-static constexpr const char* kErrCnt = "ERR CNT";
-static constexpr const char* kMqttRetry = "MQTT RETRY";
-static constexpr const char* kUpdated = "UPDATED";
+static constexpr const char* kHealth = "LUX SENDER";
+static constexpr const char* kNetwork = "SENDER LINK";
+static constexpr const char* kSensor = "SENSOR READY";
+static constexpr const char* kStatus = "SEND STATUS";
+static constexpr const char* kReason = "SEND REASON";
+static constexpr const char* kWifi = "SENDER WIFI";
+static constexpr const char* kIp = "SENDER IP";
+static constexpr const char* kErrCnt = "SENSOR ERRORS";
+static constexpr const char* kMqttRetry = "SENDER MQTT";
+static constexpr const char* kUpdated = "LAST UPDATE";
 
 // State / meaning words
 static constexpr const char* kNoData = "NO DATA";
@@ -94,7 +94,7 @@ static constexpr const char* kWifiOk = "WIFI OK";
 static constexpr const char* kWifiNg = "WIFI NG";
 static constexpr const char* kMqttOk = "MQTT OK";
 static constexpr const char* kMqttNg = "MQTT NG";
-static constexpr const char* kStatusButton = "デバイス状態";
+static constexpr const char* kStatusButton = "送信機状態";
 static constexpr const char* kBackButton = "戻る";
 static constexpr const char* kBooting = "起動中...";
 
@@ -103,7 +103,7 @@ static constexpr const char* kSlide1Title = "スライド1  現在値";
 static constexpr const char* kSlide2Title = "スライド2  変化のサイン";
 static constexpr const char* kSlide3Title = "スライド3  短期傾向 (15分)";
 static constexpr const char* kSlide4Title = "スライド4  長期傾向 (120分)";
-static constexpr const char* kStatusTitle = "デバイス状態";
+static constexpr const char* kStatusTitle = "送信機状態";
 
 // Shared labels
 static constexpr const char* kTemp = "気温";
@@ -119,16 +119,16 @@ static constexpr const char* kLight = "明るさ";
 static constexpr const char* kCurrentValues = "現在値";
 static constexpr const char* kRecentChanges = "最近の変化";
 static constexpr const char* kInterpret = "考えるヒント";
-static constexpr const char* kHealth = "本体";
-static constexpr const char* kNetwork = "通信";
-static constexpr const char* kSensor = "センサー";
-static constexpr const char* kStatus = "状態";
-static constexpr const char* kReason = "理由";
-static constexpr const char* kWifi = "Wi-Fi";
-static constexpr const char* kIp = "IP";
-static constexpr const char* kErrCnt = "エラー";
-static constexpr const char* kMqttRetry = "MQTT再試行";
-static constexpr const char* kUpdated = "更新";
+static constexpr const char* kHealth = "明るさ送信機";
+static constexpr const char* kNetwork = "送信機の通信";
+static constexpr const char* kSensor = "センサー準備";
+static constexpr const char* kStatus = "送信状態";
+static constexpr const char* kReason = "送信理由";
+static constexpr const char* kWifi = "送信機Wi-Fi";
+static constexpr const char* kIp = "送信機IP";
+static constexpr const char* kErrCnt = "センサーエラー";
+static constexpr const char* kMqttRetry = "送信機MQTT";
+static constexpr const char* kUpdated = "最終受信";
 
 // State / meaning words
 static constexpr const char* kNoData = "データなし";
