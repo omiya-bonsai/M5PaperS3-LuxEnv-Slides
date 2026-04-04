@@ -57,7 +57,7 @@ static constexpr int SD_CS_PIN = 47;
 static constexpr float SIGNAL_STEADY_DEADZONE = 0.07f;
 static constexpr const char* DEVICE_MODEL_NAME = "M5PaperS3";
 static constexpr const char* FIRMWARE_NAME = "LuxEnv Slides";
-static constexpr const char* FIRMWARE_VERSION = "0.1.0";
+static constexpr const char* FIRMWARE_VERSION = "0.1.1";
 static constexpr const char* REPOSITORY_URL = "https://github.com/omiya-bonsai/m5papers3-weather-learning-system";
 
 struct Env4Data {
