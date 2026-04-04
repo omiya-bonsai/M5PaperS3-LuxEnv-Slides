@@ -229,6 +229,8 @@ static constexpr const char* kSignalPromptsEn[] = {
 };
 
 bool isAuxiliarySlide(uint8_t slideIndex);
+void drawMonoIconColored(int x, int y, const MonoIcon& icon, int scale,
+                         uint16_t fg, uint16_t bg, bool fillBackground);
 
 enum class FooterTapAction : uint8_t {
   None,
@@ -353,16 +355,16 @@ String formatFooterTime() {
   return "--:--";
 }
 
-String formatBatteryStatus() {
+int batteryFillSegments() {
   int batt = M5.Power.getBatteryLevel();
-  if (batt < 0 || batt > 100) {
-    return ui_text::kBatteryUnknown;
-  }
-  String label = String(ui_text::kBatteryPrefix) + String(batt) + "%";
-  if (M5.Power.isCharging()) {
-    label += "+";
-  }
-  return label;
+  if (batt < 0 || batt > 100) return 0;
+  return min(15, max(0, (batt * 15 + 99) / 100));
+}
+
+String batteryPercentText() {
+  int batt = M5.Power.getBatteryLevel();
+  if (batt < 0 || batt > 100) return "--";
+  return String(batt);
 }
 
 void ensureLogDirs() {
@@ -938,8 +940,22 @@ void drawHeaderFrame(const char* title) {
 }
 
 void drawHeaderDynamic() {
-  M5.Display.fillRect(M5.Display.width() - 150, 8, 142, UI_HEADER_H - 16, TFT_BLACK);
-  drawUiTextRight(formatBatteryStatus(), M5.Display.width() - 16, 16, uiSmallFont(), TFT_WHITE, TFT_BLACK);
+  const int iconSize = 18;
+  const int gap = 20;
+  const int mqttX = M5.Display.width() - UI_MARGIN_X - iconSize;
+  const int wifiX = mqttX - gap - iconSize;
+  const int iconY = 12;
+  const bool wifiOnline = WiFi.status() == WL_CONNECTED;
+  const bool mqttOnline = mqttClient.connected();
+
+  drawMonoIconColored(wifiX, iconY, ICON_WIFI, 1,
+                      wifiOnline ? TFT_WHITE : TFT_BLACK,
+                      wifiOnline ? TFT_BLACK : TFT_WHITE,
+                      !wifiOnline);
+  drawMonoIconColored(mqttX, iconY, ICON_MQTT, 1,
+                      mqttOnline ? TFT_WHITE : TFT_BLACK,
+                      mqttOnline ? TFT_BLACK : TFT_WHITE,
+                      !mqttOnline);
 }
 
 void drawFooterButton(int x, int y, int w, const char* label, bool active = false) {
@@ -967,15 +983,35 @@ void drawFooterFrame() {
 
 void drawFooterDynamic() {
   String ts = formatFooterTime();
-  String net = (WiFi.status() == WL_CONNECTED) ? ui_text::kWifiOk : ui_text::kWifiNg;
-  String mq = mqttClient.connected() ? ui_text::kMqttOk : ui_text::kMqttNg;
   const int btnY = M5.Display.height() - UI_FOOTER_H + 6;
 
   M5.Display.fillRect(0, M5.Display.height() - UI_FOOTER_H + 1, M5.Display.width(), UI_FOOTER_H - 2, TFT_WHITE);
   M5.Display.drawLine(0, M5.Display.height() - UI_FOOTER_H, M5.Display.width(), M5.Display.height() - UI_FOOTER_H, TFT_BLACK);
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
   M5.Display.drawString(ts, UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
-  M5.Display.drawRightString(net + "  " + mq, M5.Display.width() - UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
+
+  const int gaugeRight = M5.Display.width() - UI_MARGIN_X;
+  const int numberRight = gaugeRight;
+  const int gaugeBlockRight = numberRight - 26;
+  const int gaugeWidth = 112;
+  const int gaugeLeft = gaugeBlockRight - gaugeWidth;
+  const int gaugeY = M5.Display.height() - 27;
+  const int segW = 5;
+  const int segH = 10;
+  const int gap = 2;
+  const int filled = batteryFillSegments();
+
+  for (int i = 0; i < 15; ++i) {
+    int x = gaugeLeft + i * (segW + gap);
+    M5.Display.drawRect(x, gaugeY, segW, segH, TFT_BLACK);
+    if (i >= (15 - filled)) {
+      M5.Display.fillRect(x + 1, gaugeY + 1, segW - 2, segH - 2, TFT_BLACK);
+    }
+  }
+  drawUiTextRight(batteryPercentText(), numberRight, M5.Display.height() - 31, &fonts::Font2, TFT_BLACK, TFT_WHITE);
+  if (M5.Power.isCharging()) {
+    drawUiTextLeft("+", gaugeBlockRight - 4, gaugeY - 3, &fonts::Font2, TFT_BLACK, TFT_WHITE);
+  }
 
   if (!isAuxiliarySlide(g_currentSlide)) {
     const int btnX = (M5.Display.width() - FOOTER_BUTTON_W) / 2;
@@ -1134,7 +1170,11 @@ void drawSummaryRow(const char* label, const String& value, int x, int y) {
   drawUiTextRight(value, M5.Display.width() - UI_MARGIN_X - 8, y, uiBodyFont());
 }
 
-void drawMonoIcon(int x, int y, const MonoIcon& icon, int scale = 1) {
+void drawMonoIconColored(int x, int y, const MonoIcon& icon, int scale,
+                         uint16_t fg, uint16_t bg, bool fillBackground = false) {
+  if (fillBackground) {
+    M5.Display.fillRect(x, y, icon.width * scale, icon.height * scale, bg);
+  }
   const int bytesPerRow = (icon.width + 7) / 8;
   for (int row = 0; row < icon.height; ++row) {
     int runStart = -1;
@@ -1152,11 +1192,15 @@ void drawMonoIcon(int x, int y, const MonoIcon& icon, int scale = 1) {
                             y + row * scale,
                             (col - runStart) * scale,
                             scale,
-                            TFT_BLACK);
+                            fg);
         runStart = -1;
       }
     }
   }
+}
+
+void drawMonoIcon(int x, int y, const MonoIcon& icon, int scale = 1) {
+  drawMonoIconColored(x, y, icon, scale, TFT_BLACK, TFT_WHITE, false);
 }
 
 int scaledIconWidth(const MonoIcon& icon, int scale = 1) {
