@@ -56,7 +56,7 @@ static constexpr int SD_CS_PIN = 47;
 static constexpr float SIGNAL_STEADY_DEADZONE = 0.07f;
 static constexpr const char* DEVICE_MODEL_NAME = "M5PaperS3";
 static constexpr const char* FIRMWARE_NAME = "LuxEnv Slides";
-static constexpr const char* FIRMWARE_VERSION = "dev";
+static constexpr const char* FIRMWARE_VERSION = "0.1.0";
 static constexpr const char* REPOSITORY_URL = "https://github.com/omiya-bonsai/m5papers3-weather-learning-system";
 
 struct Env4Data {
@@ -1981,8 +1981,8 @@ void drawSlideDeviceInfoBody() {
   const int qrDrawY = qrY + 28;
   M5.Display.fillRect(qrDrawX, qrDrawY, qrSize, qrSize, TFT_WHITE);
   M5.Display.qrcode(REPOSITORY_URL, qrDrawX, qrDrawY, qrSize, 6);
-  drawUiTextCenter("github.com/omiya-bonsai", M5.Display.width() / 2, qrDrawY + qrSize + 18, uiSmallFont());
-  drawUiTextCenter("/M5PaperS3-LuxEnv-Slides", M5.Display.width() / 2, qrDrawY + qrSize + 44, uiSmallFont());
+  drawUiTextCenter("github.com/omiya-bonsai/M5PaperS3-LuxEnv-Slides",
+                   M5.Display.width() / 2, qrDrawY + qrSize + 30, uiSmallFont());
 }
 
 epd_mode_t desiredEpdModeForSlide(uint8_t slideIndex) {
