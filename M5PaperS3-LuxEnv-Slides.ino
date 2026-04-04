@@ -59,6 +59,7 @@ static constexpr const char* DEVICE_MODEL_NAME = "M5PaperS3";
 static constexpr const char* FIRMWARE_NAME = "LuxEnv Slides";
 static constexpr const char* FIRMWARE_VERSION = "0.1.1";
 static constexpr const char* REPOSITORY_URL = "https://github.com/omiya-bonsai/m5papers3-weather-learning-system";
+static constexpr float ESTIMATED_BATTERY_RUNTIME_HOURS_FULL = 12.0f;
 
 struct Env4Data {
   uint32_t ts = 0;
@@ -364,7 +365,23 @@ int batteryFillSegments() {
 String batteryPercentText() {
   int batt = M5.Power.getBatteryLevel();
   if (batt < 0 || batt > 100) return "--";
-  return String(batt);
+  return M5.Power.isCharging() ? (String("+ ") + String(batt)) : String(batt);
+}
+
+String devicePowerSummary() {
+  int batt = M5.Power.getBatteryLevel();
+  if (batt < 0 || batt > 100) {
+    return M5.Power.isCharging() ? String(ui_text::kChargingNow) : String("--");
+  }
+
+  if (M5.Power.isCharging()) {
+    return String(ui_text::kChargingNow) + " / " + String(batt);
+  }
+
+  float remainHours = (ESTIMATED_BATTERY_RUNTIME_HOURS_FULL * batt) / 100.0f;
+  char buf[48];
+  snprintf(buf, sizeof(buf), "%s %.1fh / %d", ui_text::kRuntimePrefix, remainHours, batt);
+  return String(buf);
 }
 
 void ensureLogDirs() {
@@ -992,7 +1009,7 @@ void drawFooterDynamic() {
 
   const int gaugeRight = M5.Display.width() - UI_MARGIN_X;
   const int numberRight = gaugeRight;
-  const int gaugeBlockRight = numberRight - 26;
+  const int gaugeBlockRight = numberRight - 38;
   const int gaugeWidth = 112;
   const int gaugeLeft = gaugeBlockRight - gaugeWidth;
   const int gaugeY = M5.Display.height() - 27;
@@ -1009,9 +1026,6 @@ void drawFooterDynamic() {
     }
   }
   drawUiTextRight(batteryPercentText(), numberRight, M5.Display.height() - 31, &fonts::Font2, TFT_BLACK, TFT_WHITE);
-  if (M5.Power.isCharging()) {
-    drawUiTextLeft("+", gaugeBlockRight - 4, gaugeY - 3, &fonts::Font2, TFT_BLACK, TFT_WHITE);
-  }
 
   if (!isAuxiliarySlide(g_currentSlide)) {
     const int btnX = (M5.Display.width() - FOOTER_BUTTON_W) / 2;
@@ -2095,9 +2109,9 @@ void drawSlideDeviceInfoBody() {
   const int cardX = UI_MARGIN_X;
   const int cardW = M5.Display.width() - UI_MARGIN_X * 2;
   const int infoY = 126;
-  const int infoH = 318;
+  const int infoH = 358;
   const int qrY = infoY + infoH + 16;
-  const int qrH = 376;
+  const int qrH = 336;
   const int left = cardX + 18;
   const int right = cardX + cardW - 18;
 
@@ -2112,15 +2126,16 @@ void drawSlideDeviceInfoBody() {
   drawTextRowAligned(ui_text::kIp, currentDeviceIpAddress(), left, right, infoY + 214, &fonts::Font4);
   drawTextRowAligned(ui_text::kWifiState, currentWifiStateText(), left, right, infoY + 254, uiBodyFont());
   drawTextRowAligned(ui_text::kMqttState, currentMqttStateText(), left, right, infoY + 286, uiBodyFont());
+  drawTextRowAligned(ui_text::kPower, devicePowerSummary(), left, right, infoY + 318, uiBodyFont());
 
   drawCard(cardX, qrY, cardW, qrH, ui_text::kRepoQr);
-  const int qrSize = min(cardW - 56, 336);
+  const int qrSize = min(cardW - 56, 300);
   const int qrDrawX = cardX + (cardW - qrSize) / 2;
-  const int qrDrawY = qrY + 28;
+  const int qrDrawY = qrY + 24;
   M5.Display.fillRect(qrDrawX, qrDrawY, qrSize, qrSize, TFT_WHITE);
   M5.Display.qrcode(REPOSITORY_URL, qrDrawX, qrDrawY, qrSize, 6);
   drawUiTextCenter("github.com/omiya-bonsai/M5PaperS3-LuxEnv-Slides",
-                   M5.Display.width() / 2, qrDrawY + qrSize + 30, uiSmallFont());
+                   M5.Display.width() / 2, qrDrawY + qrSize + 22, uiSmallFont());
 }
 
 epd_mode_t desiredEpdModeForSlide(uint8_t slideIndex) {
