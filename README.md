@@ -116,18 +116,25 @@ Purpose:
 
 - "Is the trend continuing?"
 
-### Sender Status Screen
+### Auxiliary Screens
 
 Opened from the footer button or upward swipe.
 
 Shows:
 
-- ENV4 sender status
-- lux sender status
-- sender Wi-Fi / IP
-- sender retry / error counts
-- last received time
-- footer note that footer `WIFI / MQTT` belongs to the PaperS3 itself
+- Sender Status
+  - ENV4 sender status
+  - lux sender status
+  - sender Wi-Fi / IP
+  - sender retry / error counts
+  - last received time
+- Device Info
+  - device name
+  - firmware name / version / build timestamp
+  - PaperS3 IP / Wi-Fi / MQTT state
+  - QR code for the GitHub repository URL
+- footer buttons switch between `Sender Status` and `Device Info`
+- footer `WIFI / MQTT` belongs to the PaperS3 itself
 
 ## UI Notes
 
@@ -142,9 +149,10 @@ Shows:
 ## Navigation
 
 - normal loop: Slide 1 -> Slide 2 -> Slide 3 -> Slide 4
-- footer center button: open `Sender Status`
-- footer center button on sender status screen: back
-- upward swipe from bottom area: open `Sender Status`
+- footer center button: open auxiliary screens
+- left footer button on auxiliary screens: open the other auxiliary screen
+- right footer button on auxiliary screens: back
+- upward swipe from bottom area: open auxiliary screens
 
 ## Required Files
 

@@ -49,9 +49,15 @@ static constexpr uint32_t CSV_STALE_LIMIT_MIN = 180;
 static constexpr uint32_t NIGHT_LUX_WINDOW_MIN = 10;
 static constexpr float NIGHT_LUX_THRESHOLD = 5.0f;
 static constexpr uint8_t MAIN_SLIDE_COUNT = 4;
+static constexpr uint8_t AUX_SLIDE_COUNT = 2;
 static constexpr uint8_t STATUS_SCREEN_INDEX = 4;
+static constexpr uint8_t DEVICE_INFO_SCREEN_INDEX = 5;
 static constexpr int SD_CS_PIN = 47;
 static constexpr float SIGNAL_STEADY_DEADZONE = 0.07f;
+static constexpr const char* DEVICE_MODEL_NAME = "M5PaperS3";
+static constexpr const char* FIRMWARE_NAME = "LuxEnv Slides";
+static constexpr const char* FIRMWARE_VERSION = "dev";
+static constexpr const char* REPOSITORY_URL = "https://github.com/omiya-bonsai/m5papers3-weather-learning-system";
 
 struct Env4Data {
   uint32_t ts = 0;
@@ -210,6 +216,16 @@ static constexpr const char* kSignalPromptsEn[] = {
   "How many rain signs can you find?",
   "Does the current pattern look rainy?",
   "Which sign points to rain?",
+};
+
+bool isAuxiliarySlide(uint8_t slideIndex);
+
+enum class FooterTapAction : uint8_t {
+  None,
+  OpenAux,
+  ExitAux,
+  ShowStatus,
+  ShowDeviceInfo,
 };
 
 // ---------------------- utilities ----------------------------
@@ -775,6 +791,9 @@ static constexpr int FOOTER_BUTTON_W = 96;
 static constexpr int FOOTER_BUTTON_H = 22;
 static constexpr int FOOTER_BUTTON_HIT_W = 164;
 static constexpr int FOOTER_BUTTON_HIT_H = 38;
+static constexpr int AUX_FOOTER_TAB_W = 92;
+static constexpr int AUX_FOOTER_BACK_W = 64;
+static constexpr int AUX_FOOTER_GAP = 10;
 static constexpr int STATUS_SWIPE_START_Y = 760;
 static constexpr int STATUS_SWIPE_MIN_DISTANCE = 120;
 static constexpr int STATUS_SWIPE_MAX_SIDE_SHIFT = 80;
@@ -860,6 +879,38 @@ void drawUiTextCenter(const String& text, int centerX, int y, const lgfx::IFont*
   drawUiTextCenter(text.c_str(), centerX, y, font, fg, bg);
 }
 
+void drawUiTextMultilineLeft(const char* text, int x, int y, const lgfx::IFont* font,
+                             int lineGap = 4, uint16_t fg = TFT_BLACK, uint16_t bg = TFT_WHITE) {
+  if (!text) return;
+
+  String remaining(text);
+  int lineY = y;
+  while (remaining.length() > 0) {
+    int newline = remaining.indexOf('\n');
+    String line = (newline >= 0) ? remaining.substring(0, newline) : remaining;
+    drawUiTextLeft(line, x, lineY, font, fg, bg);
+    lineY += M5.Display.fontHeight(font) + lineGap;
+    if (newline < 0) break;
+    remaining = remaining.substring(newline + 1);
+  }
+}
+
+void drawUiTextMultilineCenter(const char* text, int centerX, int y, const lgfx::IFont* font,
+                               int lineGap = 4, uint16_t fg = TFT_BLACK, uint16_t bg = TFT_WHITE) {
+  if (!text) return;
+
+  String remaining(text);
+  int lineY = y;
+  while (remaining.length() > 0) {
+    int newline = remaining.indexOf('\n');
+    String line = (newline >= 0) ? remaining.substring(0, newline) : remaining;
+    drawUiTextCenter(line, centerX, lineY, font, fg, bg);
+    lineY += M5.Display.fontHeight(font) + lineGap;
+    if (newline < 0) break;
+    remaining = remaining.substring(newline + 1);
+  }
+}
+
 void drawHeaderFrame(const char* title) {
   M5.Display.fillScreen(TFT_WHITE);
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
@@ -878,30 +929,53 @@ void drawHeaderDynamic() {
   drawUiTextRight(formatBatteryStatus(), M5.Display.width() - 16, 16, uiSmallFont(), TFT_WHITE, TFT_BLACK);
 }
 
+void drawFooterButton(int x, int y, int w, const char* label, bool active = false) {
+  uint16_t fill = active ? TFT_BLACK : TFT_WHITE;
+  uint16_t text = active ? TFT_WHITE : TFT_BLACK;
+  M5.Display.fillRect(x + 1, y + 1, w - 2, FOOTER_BUTTON_H - 2, fill);
+  M5.Display.drawRect(x, y, w, FOOTER_BUTTON_H, TFT_BLACK);
+  M5.Display.drawRect(x, y, w, FOOTER_BUTTON_H, TFT_BLACK);
+  drawUiTextCenter(label, x + w / 2, y + 4, uiSmallFont(), text, fill);
+}
+
 void drawFooterFrame() {
   M5.Display.drawLine(0, M5.Display.height() - UI_FOOTER_H, M5.Display.width(), M5.Display.height() - UI_FOOTER_H, TFT_BLACK);
-  const int btnX = (M5.Display.width() - FOOTER_BUTTON_W) / 2;
   const int btnY = M5.Display.height() - UI_FOOTER_H + 6;
-  M5.Display.drawRect(btnX, btnY, FOOTER_BUTTON_W, FOOTER_BUTTON_H, TFT_BLACK);
+  if (!isAuxiliarySlide(g_currentSlide)) {
+    const int btnX = (M5.Display.width() - FOOTER_BUTTON_W) / 2;
+    M5.Display.drawRect(btnX, btnY, FOOTER_BUTTON_W, FOOTER_BUTTON_H, TFT_BLACK);
+    return;
+  }
+
+  const int totalW = AUX_FOOTER_TAB_W + AUX_FOOTER_BACK_W + AUX_FOOTER_GAP;
+  const int startX = (M5.Display.width() - totalW) / 2;
+  M5.Display.drawRect(startX, btnY, AUX_FOOTER_TAB_W, FOOTER_BUTTON_H, TFT_BLACK);
+  M5.Display.drawRect(startX + AUX_FOOTER_TAB_W + AUX_FOOTER_GAP, btnY, AUX_FOOTER_BACK_W, FOOTER_BUTTON_H, TFT_BLACK);
 }
 
 void drawFooterDynamic() {
   String ts = formatFooterTime();
   String net = (WiFi.status() == WL_CONNECTED) ? ui_text::kWifiOk : ui_text::kWifiNg;
   String mq = mqttClient.connected() ? ui_text::kMqttOk : ui_text::kMqttNg;
-  const int btnX = (M5.Display.width() - FOOTER_BUTTON_W) / 2;
   const int btnY = M5.Display.height() - UI_FOOTER_H + 6;
-  const char* btnLabel = (g_currentSlide == STATUS_SCREEN_INDEX) ? ui_text::kBackButton : ui_text::kStatusButton;
 
-  M5.Display.fillRect(0, M5.Display.height() - UI_FOOTER_H + 1, btnX - 8, UI_FOOTER_H - 2, TFT_WHITE);
-  M5.Display.fillRect(btnX + 1, btnY + 1, FOOTER_BUTTON_W - 2, FOOTER_BUTTON_H - 2, TFT_WHITE);
-  M5.Display.fillRect(btnX + FOOTER_BUTTON_W + 8, M5.Display.height() - UI_FOOTER_H + 1,
-                      M5.Display.width() - (btnX + FOOTER_BUTTON_W + 8), UI_FOOTER_H - 2, TFT_WHITE);
+  M5.Display.fillRect(0, M5.Display.height() - UI_FOOTER_H + 1, M5.Display.width(), UI_FOOTER_H - 2, TFT_WHITE);
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
   M5.Display.drawString(ts, UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
-  drawUiTextCenter(btnLabel, btnX + FOOTER_BUTTON_W / 2, btnY + 4, uiSmallFont());
-  M5.Display.drawRect(btnX, btnY, FOOTER_BUTTON_W, FOOTER_BUTTON_H, TFT_BLACK);
   M5.Display.drawRightString(net + "  " + mq, M5.Display.width() - UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
+
+  if (!isAuxiliarySlide(g_currentSlide)) {
+    const int btnX = (M5.Display.width() - FOOTER_BUTTON_W) / 2;
+    drawFooterButton(btnX, btnY, FOOTER_BUTTON_W, ui_text::kAuxButton);
+    return;
+  }
+
+  const int totalW = AUX_FOOTER_TAB_W + AUX_FOOTER_BACK_W + AUX_FOOTER_GAP;
+  const int startX = (M5.Display.width() - totalW) / 2;
+  const char* navLabel = (g_currentSlide == STATUS_SCREEN_INDEX) ? ui_text::kDeviceTabButton
+                                                                 : ui_text::kStatusTabButton;
+  drawFooterButton(startX, btnY, AUX_FOOTER_TAB_W, navLabel);
+  drawFooterButton(startX + AUX_FOOTER_TAB_W + AUX_FOOTER_GAP, btnY, AUX_FOOTER_BACK_W, ui_text::kBackButton);
 }
 
 void clearContentArea() {
@@ -916,24 +990,79 @@ const char* currentSlideTitle() {
     case 2: return ui_text::kSlide3Title;
     case 3: return ui_text::kSlide4Title;
     case STATUS_SCREEN_INDEX: return ui_text::kStatusTitle;
+    case DEVICE_INFO_SCREEN_INDEX: return ui_text::kDeviceInfoTitle;
     default: return ui_text::kSlide1Title;
   }
 }
 
-bool footerButtonContains(int x, int y) {
-  const int hitX = (M5.Display.width() - FOOTER_BUTTON_HIT_W) / 2;
+FooterTapAction footerTapActionAt(int x, int y) {
   const int hitY = M5.Display.height() - UI_FOOTER_H;
-  return x >= hitX && x < (hitX + FOOTER_BUTTON_HIT_W)
-      && y >= hitY && y < (hitY + FOOTER_BUTTON_HIT_H);
+  if (y < hitY || y >= (hitY + FOOTER_BUTTON_HIT_H)) return FooterTapAction::None;
+
+  if (!isAuxiliarySlide(g_currentSlide)) {
+  const int hitX = (M5.Display.width() - FOOTER_BUTTON_HIT_W) / 2;
+    if (x >= hitX && x < (hitX + FOOTER_BUTTON_HIT_W)) {
+      return FooterTapAction::OpenAux;
+    }
+    return FooterTapAction::None;
+  }
+
+  const int totalW = AUX_FOOTER_TAB_W + AUX_FOOTER_BACK_W + AUX_FOOTER_GAP;
+  const int startX = (M5.Display.width() - totalW) / 2;
+  const int navX = startX;
+  const int backX = navX + AUX_FOOTER_TAB_W + AUX_FOOTER_GAP;
+
+  if (x >= navX && x < (navX + AUX_FOOTER_TAB_W)) {
+    return (g_currentSlide == STATUS_SCREEN_INDEX) ? FooterTapAction::ShowDeviceInfo
+                                                   : FooterTapAction::ShowStatus;
+  }
+  if (x >= backX && x < (backX + AUX_FOOTER_BACK_W)) return FooterTapAction::ExitAux;
+  return FooterTapAction::None;
 }
 
 bool isStatusSwipe(const m5::touch_detail_t& touch) {
-  if (g_currentSlide == STATUS_SCREEN_INDEX) return false;
+  if (g_currentSlide >= STATUS_SCREEN_INDEX) return false;
   if (!(touch.wasFlicked() || touch.wasDragged() || touch.wasReleased())) return false;
   if (touch.base_y < STATUS_SWIPE_START_Y) return false;
   if (touch.distanceY() > -STATUS_SWIPE_MIN_DISTANCE) return false;
   if (abs(touch.distanceX()) > STATUS_SWIPE_MAX_SIDE_SHIFT) return false;
   return true;
+}
+
+bool isAuxiliarySlide(uint8_t slideIndex) {
+  return slideIndex >= STATUS_SCREEN_INDEX
+      && slideIndex < (STATUS_SCREEN_INDEX + AUX_SLIDE_COUNT);
+}
+
+void enterAuxiliarySlides() {
+  if (!isAuxiliarySlide(g_currentSlide)) {
+    g_lastMainSlide = g_currentSlide;
+  }
+  g_currentSlide = STATUS_SCREEN_INDEX;
+}
+
+void exitAuxiliarySlides() {
+  g_currentSlide = g_lastMainSlide;
+}
+
+void cycleAuxiliarySlides(int delta) {
+  int next = static_cast<int>(g_currentSlide) - static_cast<int>(STATUS_SCREEN_INDEX);
+  next = (next + delta + AUX_SLIDE_COUNT) % AUX_SLIDE_COUNT;
+  g_currentSlide = STATUS_SCREEN_INDEX + static_cast<uint8_t>(next);
+}
+
+String currentDeviceIpAddress() {
+  return (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : String("0.0.0.0");
+}
+
+String currentWifiStateText() {
+  return (WiFi.status() == WL_CONNECTED) ? String(ui_text::kConnected)
+                                         : String(ui_text::kDisconnected);
+}
+
+String currentMqttStateText() {
+  return mqttClient.connected() ? String(ui_text::kConnected)
+                                : String(ui_text::kDisconnected);
 }
 
 void drawKeyValue(const char* label, const String& value, int x, int y, const lgfx::IFont* valueFont = &fonts::Font4) {
@@ -1089,6 +1218,10 @@ String formatClockOnly(uint32_t ts) {
   char buf[16];
   snprintf(buf, sizeof(buf), "%02d:%02d", tmLocal.tm_hour, tmLocal.tm_min);
   return String(buf);
+}
+
+String buildTimestampText() {
+  return String(__DATE__) + " " + String(__TIME__);
 }
 
 double normalizeDegrees(double deg) {
@@ -1263,8 +1396,8 @@ const char* statusScreenScopeLine1() {
 }
 
 const char* statusScreenScopeLine2() {
-  return isJapaneseUi() ? "フッター右の WIFI / MQTT は、この表示本体の通信状態です"
-                        : "Footer WIFI/MQTT shows this display device.";
+  return isJapaneseUi() ? "フッターのボタンで本機情報へ切替 / 右の WIFI / MQTT は本機です"
+                        : "Use the footer button for device info. Right WIFI/MQTT is this device.";
 }
 
 const char* env4SenderTitle() {
@@ -1817,11 +1950,57 @@ void drawSlideStatusBody() {
   }
 }
 
+void drawSlideDeviceInfoBody() {
+  const int cardX = UI_MARGIN_X;
+  const int cardW = M5.Display.width() - UI_MARGIN_X * 2;
+  const int infoY = 126;
+  const int infoH = 318;
+  const int qrY = infoY + infoH + 16;
+  const int qrH = 304;
+  const int urlY = qrY + qrH + 16;
+  const int urlH = 108;
+  const int hintY = urlY + urlH + 22;
+  const int left = cardX + 18;
+  const int right = cardX + cardW - 18;
+
+  drawUiTextLeft(ui_text::kDeviceScopeLine1, UI_MARGIN_X + 8, 78, uiSmallFont());
+  drawUiTextLeft(ui_text::kDeviceScopeLine2, UI_MARGIN_X + 8, 100, uiSmallFont());
+
+  drawCard(cardX, infoY, cardW, infoH, ui_text::kDeviceInfoTitle);
+  drawTextRowAligned(ui_text::kDeviceName, String(DEVICE_MODEL_NAME), left, right, infoY + 54, &fonts::Font4);
+  drawTextRowAligned(ui_text::kFirmware, String(FIRMWARE_NAME), left, right, infoY + 94, &fonts::Font4);
+  drawTextRowAligned(ui_text::kVersion, String(FIRMWARE_VERSION), left, right, infoY + 134, &fonts::Font4);
+  drawTextRowAligned(ui_text::kBuild, buildTimestampText(), left, right, infoY + 174, &fonts::Font2);
+  drawTextRowAligned(ui_text::kIp, currentDeviceIpAddress(), left, right, infoY + 214, &fonts::Font4);
+  drawTextRowAligned(ui_text::kWifiState, currentWifiStateText(), left, right, infoY + 254, uiBodyFont());
+  drawTextRowAligned(ui_text::kMqttState, currentMqttStateText(), left, right, infoY + 286, uiBodyFont());
+
+  drawCard(cardX, qrY, cardW, qrH, ui_text::kRepoQr);
+  const int qrSize = min(cardW - 96, 280);
+  const int qrDrawX = cardX + 28;
+  const int qrDrawY = qrY + 18;
+  M5.Display.fillRect(qrDrawX, qrDrawY, qrSize, qrSize, TFT_WHITE);
+  M5.Display.qrcode(REPOSITORY_URL, qrDrawX, qrDrawY, qrSize, 6);
+  const int hintX = qrDrawX + qrSize + 18;
+  const int hintW = cardX + cardW - 22 - hintX;
+  M5.Display.drawRect(hintX - 8, qrDrawY, hintW + 16, qrSize, TFT_BLACK);
+  drawUiTextLeft(ui_text::kRepoUrlLabel, hintX, qrDrawY + 18, uiSmallFont());
+  drawUiTextMultilineLeft(ui_text::kQrScanHint, hintX, qrDrawY + 56, uiBodyFont(), 8);
+  drawUiTextLeft("github.com/omiya-bonsai", hintX, qrDrawY + 148, uiSmallFont());
+  drawUiTextLeft("/m5papers3-weather-learning-system", hintX, qrDrawY + 178, uiSmallFont());
+
+  drawCard(cardX, urlY, cardW, urlH, ui_text::kRepoUrlLabel);
+  drawUiTextLeft("github.com/omiya-bonsai", cardX + 16, urlY + 40, uiBodyFont());
+  drawUiTextLeft("/m5papers3-weather-learning-system", cardX + 16, urlY + 74, uiBodyFont());
+  drawUiTextMultilineCenter(ui_text::kAuxHint, M5.Display.width() / 2, hintY - 6, uiSmallFont(), 2);
+}
+
 epd_mode_t desiredEpdModeForSlide(uint8_t slideIndex) {
   switch (slideIndex) {
     case 0:
     case 1:
     case STATUS_SCREEN_INDEX:
+    case DEVICE_INFO_SCREEN_INDEX:
       return epd_mode_t::epd_text;
     default:
       return epd_mode_t::epd_quality;
@@ -1852,6 +2031,7 @@ void renderSlide(bool fullFrame) {
     case 2: drawSlideGraphsShortBody(); break;
     case 3: drawSlideGraphsLongBody(); break;
     case STATUS_SCREEN_INDEX: drawSlideStatusBody(); break;
+    case DEVICE_INFO_SCREEN_INDEX: drawSlideDeviceInfoBody(); break;
     default: drawSlideSummaryBody(); break;
   }
 
@@ -1912,8 +2092,8 @@ void setup() {
 
 void handleButtons() {
   if (M5.BtnA.wasClicked()) {
-    if (g_currentSlide == STATUS_SCREEN_INDEX) {
-      g_currentSlide = g_lastMainSlide;
+    if (isAuxiliarySlide(g_currentSlide)) {
+      cycleAuxiliarySlides(-1);
     } else {
       g_currentSlide = (g_currentSlide + MAIN_SLIDE_COUNT - 1) % MAIN_SLIDE_COUNT;
       g_lastMainSlide = g_currentSlide;
@@ -1923,8 +2103,8 @@ void handleButtons() {
     g_forceImmediateRender = true;
   }
   if (M5.BtnC.wasClicked()) {
-    if (g_currentSlide == STATUS_SCREEN_INDEX) {
-      g_currentSlide = g_lastMainSlide;
+    if (isAuxiliarySlide(g_currentSlide)) {
+      cycleAuxiliarySlides(1);
     } else {
       g_currentSlide = (g_currentSlide + 1) % MAIN_SLIDE_COUNT;
       g_lastMainSlide = g_currentSlide;
@@ -1940,19 +2120,28 @@ void handleButtons() {
 
   if (M5.Touch.getCount()) {
     const auto& touch = M5.Touch.getDetail();
-    if (touch.wasClicked() && footerButtonContains(touch.x, touch.y)) {
-      if (g_currentSlide == STATUS_SCREEN_INDEX) {
-        g_currentSlide = g_lastMainSlide;
-      } else {
-        g_lastMainSlide = g_currentSlide;
+    bool handledTouch = false;
+    if (touch.wasClicked()) {
+      FooterTapAction action = footerTapActionAt(touch.x, touch.y);
+      if (action == FooterTapAction::OpenAux) {
+        enterAuxiliarySlides();
+        handledTouch = true;
+      } else if (action == FooterTapAction::ExitAux) {
+        exitAuxiliarySlides();
+        handledTouch = true;
+      } else if (action == FooterTapAction::ShowStatus) {
         g_currentSlide = STATUS_SCREEN_INDEX;
+        handledTouch = true;
+      } else if (action == FooterTapAction::ShowDeviceInfo) {
+        g_currentSlide = DEVICE_INFO_SCREEN_INDEX;
+        handledTouch = true;
       }
-      g_lastSlideMs = millis();
-      g_needRedraw = true;
-      g_forceImmediateRender = true;
     } else if (isStatusSwipe(touch)) {
-      g_lastMainSlide = g_currentSlide;
-      g_currentSlide = STATUS_SCREEN_INDEX;
+      enterAuxiliarySlides();
+      handledTouch = true;
+    }
+
+    if (handledTouch) {
       g_lastSlideMs = millis();
       g_needRedraw = true;
       g_forceImmediateRender = true;
@@ -1975,7 +2164,7 @@ void loop() {
 
   uint32_t nowMs = millis();
   if (!g_renderInProgress && nowMs - g_lastSlideMs >= SLIDE_INTERVAL_MS) {
-    if (g_currentSlide != STATUS_SCREEN_INDEX) {
+    if (!isAuxiliarySlide(g_currentSlide)) {
       g_currentSlide = (g_currentSlide + 1) % MAIN_SLIDE_COUNT;
       g_lastMainSlide = g_currentSlide;
       g_lastSlideMs = nowMs;
