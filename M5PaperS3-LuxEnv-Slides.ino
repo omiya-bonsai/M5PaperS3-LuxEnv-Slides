@@ -4,6 +4,7 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <time.h>
+#include <stdarg.h>
 
 #include "config.h"
 #include "icons.h"
@@ -203,6 +204,10 @@ bool g_forceImmediateRender = false;
 uint8_t g_lastRenderedSlide = 255;
 uint8_t g_signalPromptIndex = 0;
 epd_mode_t g_currentEpdMode = epd_mode_t::epd_quality;
+static constexpr size_t BOOT_LOG_MAX_LINES = 12;
+String g_bootLogLines[BOOT_LOG_MAX_LINES];
+size_t g_bootLogCount = 0;
+bool g_bootLogScreenActive = false;
 
 static constexpr const char* kSignalPromptsJa[] = {
   "3つの変化はそろっているかな？",
@@ -1227,6 +1232,55 @@ String buildTimestampText() {
   return String(__DATE__) + " " + String(__TIME__);
 }
 
+void appendBootLogLine(const String& line) {
+  if (g_bootLogCount < BOOT_LOG_MAX_LINES) {
+    g_bootLogLines[g_bootLogCount++] = line;
+    return;
+  }
+
+  for (size_t i = 1; i < BOOT_LOG_MAX_LINES; ++i) {
+    g_bootLogLines[i - 1] = g_bootLogLines[i];
+  }
+  g_bootLogLines[BOOT_LOG_MAX_LINES - 1] = line;
+}
+
+void drawBootLogScreen() {
+  if (!g_bootLogScreenActive) return;
+
+  M5.Display.fillScreen(TFT_WHITE);
+  M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
+  drawUiTextLeft(ui_text::kBooting, 30, 24, uiBodyFont());
+  M5.Display.drawLine(24, 60, M5.Display.width() - 24, 60, TFT_BLACK);
+
+  int y = 78;
+  for (size_t i = 0; i < g_bootLogCount; ++i) {
+    drawUiTextLeft(g_bootLogLines[i], 30, y, uiSmallFont());
+    y += M5.Display.fontHeight(uiSmallFont()) + 10;
+  }
+}
+
+void activateBootLogScreen() {
+  g_bootLogScreenActive = true;
+  drawBootLogScreen();
+}
+
+void logBootLine(const String& line) {
+  Serial.println(line);
+  appendBootLogLine(line);
+  if (g_bootLogScreenActive) {
+    drawBootLogScreen();
+  }
+}
+
+void logBootf(const char* fmt, ...) {
+  char buf[128];
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+  logBootLine(String(buf));
+}
+
 double normalizeDegrees(double deg) {
   while (deg < 0.0) deg += 360.0;
   while (deg >= 360.0) deg -= 360.0;
@@ -2033,51 +2087,48 @@ void renderSlide(bool fullFrame) {
 void setup() {
   Serial.begin(115200);
   delay(500);
-  Serial.println("[SETUP] begin");
+  logBootLine("[SETUP] begin");
   randomSeed((uint32_t)micros());
 
   auto cfg = M5.config();
   cfg.external_spk = false;
-  Serial.println("[SETUP] calling M5.begin()");
+  logBootLine("[SETUP] calling M5.begin()");
   M5.begin(cfg);
-  Serial.println("[SETUP] M5.begin() done");
+  logBootLine("[SETUP] M5.begin() done");
 
   // Portrait layout fits the teaching flow better.
   M5.Display.setRotation(0);
   M5.update();
-  Serial.println("[SETUP] display rotation done");
+  logBootLine("[SETUP] display rotation done");
 
   M5.Display.setEpdMode(g_currentEpdMode);
-  Serial.println("[SETUP] EPD mode set");
-
-  M5.Display.fillScreen(TFT_WHITE);
-  M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
-  drawUiTextLeft(ui_text::kBooting, 30, 30, uiBodyFont());
-  Serial.println("[SETUP] boot screen drawn");
+  logBootLine("[SETUP] EPD mode set");
+  activateBootLogScreen();
+  logBootLine("[SETUP] boot screen drawn");
 
   g_sdReady = SD.begin(SD_CS_PIN, SPI, 40000000);  // 40 MHz for stable SD access on PaperS3.
-  Serial.printf("[SETUP] SD.begin() -> %s\n", g_sdReady ? "ok" : "ng");
+  logBootf("[SETUP] SD.begin() -> %s", g_sdReady ? "ok" : "ng");
   if (g_sdReady) {
     ensureLogDirs();
     loadLatestState();
     restoreHistoryFromCsv();
-    Serial.println("[SETUP] state restored");
+    logBootLine("[SETUP] state restored");
   }
 
   WiFi.mode(WIFI_STA);
   mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
   mqttClient.setCallback(mqttCallback);
-  Serial.println("[SETUP] network configured");
+  logBootLine("[SETUP] network configured");
 
   connectWiFiIfNeeded();
   syncNtpIfNeeded();
-  Serial.println("[SETUP] initial connect attempts done");
+  logBootLine("[SETUP] initial connect attempts done");
 
   g_needRedraw = true;
   g_lastSlideMs = millis();
   g_lastRefreshMs = millis() - EPD_REFRESH_MS;
   g_lastStateSaveMs = millis();
-  Serial.println("[SETUP] ready");
+  logBootLine("[SETUP] ready");
 }
 
 void handleButtons() {
