@@ -27,3 +27,8 @@ static constexpr double CONFIG_SITE_LONGITUDE    = 139.6455;
 static constexpr uint8_t UI_LANG_EN = 0;
 static constexpr uint8_t UI_LANG_JA = 1;
 static constexpr uint8_t CONFIG_UI_LANG = UI_LANG_EN;
+
+// Display rotation.
+// `0` is portrait with the default connector direction.
+// `2` rotates the display by 180 degrees.
+static constexpr uint8_t CONFIG_DISPLAY_ROTATION = 0;

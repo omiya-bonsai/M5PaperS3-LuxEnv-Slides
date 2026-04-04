@@ -2137,7 +2137,7 @@ void setup() {
   logBootLine("[SETUP] M5.begin() done");
 
   // Portrait layout fits the teaching flow better.
-  M5.Display.setRotation(0);
+  M5.Display.setRotation(CONFIG_DISPLAY_ROTATION);
   M5.update();
   logBootLine("[SETUP] display rotation done");
 
