@@ -205,9 +205,11 @@ uint8_t g_lastRenderedSlide = 255;
 uint8_t g_signalPromptIndex = 0;
 epd_mode_t g_currentEpdMode = epd_mode_t::epd_quality;
 static constexpr size_t BOOT_LOG_MAX_LINES = 12;
+static constexpr uint32_t BOOT_LOG_MIN_MS = 3000;
 String g_bootLogLines[BOOT_LOG_MAX_LINES];
 size_t g_bootLogCount = 0;
 bool g_bootLogScreenActive = false;
+uint32_t g_bootLogActivatedMs = 0;
 
 static constexpr const char* kSignalPromptsJa[] = {
   "3つの変化はそろっているかな？",
@@ -341,8 +343,11 @@ bool hasValidDisplayTime() {
 }
 
 String formatFooterTime() {
-  if (!hasValidDisplayTime()) return "--:--";
-  return formatUnixTime(g_liveDisplayTs);
+  if (hasValidDisplayTime()) return formatUnixTime(g_liveDisplayTs);
+  if (g_timeValid && time(nullptr) > 1700000000UL) {
+    return formatUnixTime((uint32_t)time(nullptr));
+  }
+  return "--:--";
 }
 
 String formatBatteryStatus() {
@@ -1261,7 +1266,16 @@ void drawBootLogScreen() {
 
 void activateBootLogScreen() {
   g_bootLogScreenActive = true;
+  g_bootLogActivatedMs = millis();
   drawBootLogScreen();
+}
+
+bool shouldLeaveBootLogScreen() {
+  if (!g_bootLogScreenActive) return true;
+
+  uint32_t elapsed = millis() - g_bootLogActivatedMs;
+  if (elapsed < BOOT_LOG_MIN_MS) return false;
+  return formatFooterTime() != "--:--";
 }
 
 void logBootLine(const String& line) {
@@ -2194,7 +2208,6 @@ void loop() {
   M5.update();
   bool manualRefresh = M5.BtnB.wasClicked();
 
-  handleButtons();
   connectWiFiIfNeeded();
   syncNtpIfNeeded();
   ensureMqttConnected();
@@ -2202,6 +2215,20 @@ void loop() {
   if (mqttClient.connected()) {
     mqttClient.loop();
   }
+
+  if (g_bootLogScreenActive) {
+    if (!shouldLeaveBootLogScreen()) {
+      delay(20);
+      return;
+    }
+
+    g_bootLogScreenActive = false;
+    g_needRedraw = true;
+    g_forceImmediateRender = true;
+    g_lastSlideMs = millis();
+  }
+
+  handleButtons();
 
   uint32_t nowMs = millis();
   if (!g_renderInProgress && nowMs - g_lastSlideMs >= SLIDE_INTERVAL_MS) {
