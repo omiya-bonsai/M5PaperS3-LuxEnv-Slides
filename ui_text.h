@@ -53,16 +53,13 @@ static constexpr const char* kDeviceName = "DEVICE";
 static constexpr const char* kFirmware = "FIRMWARE";
 static constexpr const char* kVersion = "VERSION";
 static constexpr const char* kBuild = "BUILD";
-static constexpr const char* kRepoQr = "GITHUB QR";
+static constexpr const char* kRepoQr = "GitHub QR";
 static constexpr const char* kWifiState = "WIFI";
 static constexpr const char* kMqttState = "MQTT";
 static constexpr const char* kConnected = "CONNECTED";
 static constexpr const char* kDisconnected = "DISCONNECTED";
-static constexpr const char* kAuxHint = "Use footer buttons to switch\nsender and device info";
 static constexpr const char* kDeviceScopeLine1 = "This screen shows the PaperS3 itself.";
 static constexpr const char* kDeviceScopeLine2 = "Use the footer buttons to switch screens.";
-static constexpr const char* kQrScanHint = "Scan to open\nthe repository";
-static constexpr const char* kRepoUrlLabel = "URL";
 
 // State / meaning words
 static constexpr const char* kNoData = "NO DATA";
@@ -158,11 +155,8 @@ static constexpr const char* kWifiState = "Wi-Fi";
 static constexpr const char* kMqttState = "MQTT";
 static constexpr const char* kConnected = "接続中";
 static constexpr const char* kDisconnected = "未接続";
-static constexpr const char* kAuxHint = "フッターのボタンで送信機状態と\n本機情報を切り替え";
 static constexpr const char* kDeviceScopeLine1 = "この画面は PaperS3 本体の情報を表示します";
 static constexpr const char* kDeviceScopeLine2 = "フッターのボタンで画面を切り替えできます";
-static constexpr const char* kQrScanHint = "QRを読み取ると\nリポジトリを開けます";
-static constexpr const char* kRepoUrlLabel = "URL";
 
 // State / meaning words
 static constexpr const char* kNoData = "データなし";
@@ -257,11 +251,8 @@ static constexpr const char* kWifiState = UI_TEXT_SELECT(kWifiState);
 static constexpr const char* kMqttState = UI_TEXT_SELECT(kMqttState);
 static constexpr const char* kConnected = UI_TEXT_SELECT(kConnected);
 static constexpr const char* kDisconnected = UI_TEXT_SELECT(kDisconnected);
-static constexpr const char* kAuxHint = UI_TEXT_SELECT(kAuxHint);
 static constexpr const char* kDeviceScopeLine1 = UI_TEXT_SELECT(kDeviceScopeLine1);
 static constexpr const char* kDeviceScopeLine2 = UI_TEXT_SELECT(kDeviceScopeLine2);
-static constexpr const char* kQrScanHint = UI_TEXT_SELECT(kQrScanHint);
-static constexpr const char* kRepoUrlLabel = UI_TEXT_SELECT(kRepoUrlLabel);
 
 static constexpr const char* kNoData = UI_TEXT_SELECT(kNoData);
 static constexpr const char* kNight = UI_TEXT_SELECT(kNight);

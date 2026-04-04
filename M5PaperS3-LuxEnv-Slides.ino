@@ -934,7 +934,6 @@ void drawFooterButton(int x, int y, int w, const char* label, bool active = fals
   uint16_t text = active ? TFT_WHITE : TFT_BLACK;
   M5.Display.fillRect(x + 1, y + 1, w - 2, FOOTER_BUTTON_H - 2, fill);
   M5.Display.drawRect(x, y, w, FOOTER_BUTTON_H, TFT_BLACK);
-  M5.Display.drawRect(x, y, w, FOOTER_BUTTON_H, TFT_BLACK);
   drawUiTextCenter(label, x + w / 2, y + 4, uiSmallFont(), text, fill);
 }
 
@@ -960,6 +959,7 @@ void drawFooterDynamic() {
   const int btnY = M5.Display.height() - UI_FOOTER_H + 6;
 
   M5.Display.fillRect(0, M5.Display.height() - UI_FOOTER_H + 1, M5.Display.width(), UI_FOOTER_H - 2, TFT_WHITE);
+  M5.Display.drawLine(0, M5.Display.height() - UI_FOOTER_H, M5.Display.width(), M5.Display.height() - UI_FOOTER_H, TFT_BLACK);
   M5.Display.setTextColor(TFT_BLACK, TFT_WHITE);
   M5.Display.drawString(ts, UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
   M5.Display.drawRightString(net + "  " + mq, M5.Display.width() - UI_MARGIN_X, M5.Display.height() - 28, &fonts::Font2);
@@ -967,6 +967,7 @@ void drawFooterDynamic() {
   if (!isAuxiliarySlide(g_currentSlide)) {
     const int btnX = (M5.Display.width() - FOOTER_BUTTON_W) / 2;
     drawFooterButton(btnX, btnY, FOOTER_BUTTON_W, ui_text::kAuxButton);
+    M5.Display.drawRect(btnX, btnY, FOOTER_BUTTON_W, FOOTER_BUTTON_H, TFT_BLACK);
     return;
   }
 
@@ -976,6 +977,8 @@ void drawFooterDynamic() {
                                                                  : ui_text::kStatusTabButton;
   drawFooterButton(startX, btnY, AUX_FOOTER_TAB_W, navLabel);
   drawFooterButton(startX + AUX_FOOTER_TAB_W + AUX_FOOTER_GAP, btnY, AUX_FOOTER_BACK_W, ui_text::kBackButton);
+  M5.Display.drawRect(startX, btnY, AUX_FOOTER_TAB_W, FOOTER_BUTTON_H, TFT_BLACK);
+  M5.Display.drawRect(startX + AUX_FOOTER_TAB_W + AUX_FOOTER_GAP, btnY, AUX_FOOTER_BACK_W, FOOTER_BUTTON_H, TFT_BLACK);
 }
 
 void clearContentArea() {
@@ -1956,10 +1959,7 @@ void drawSlideDeviceInfoBody() {
   const int infoY = 126;
   const int infoH = 318;
   const int qrY = infoY + infoH + 16;
-  const int qrH = 304;
-  const int urlY = qrY + qrH + 16;
-  const int urlH = 108;
-  const int hintY = urlY + urlH + 22;
+  const int qrH = 376;
   const int left = cardX + 18;
   const int right = cardX + cardW - 18;
 
@@ -1976,23 +1976,11 @@ void drawSlideDeviceInfoBody() {
   drawTextRowAligned(ui_text::kMqttState, currentMqttStateText(), left, right, infoY + 286, uiBodyFont());
 
   drawCard(cardX, qrY, cardW, qrH, ui_text::kRepoQr);
-  const int qrSize = min(cardW - 96, 280);
-  const int qrDrawX = cardX + 28;
-  const int qrDrawY = qrY + 18;
+  const int qrSize = min(cardW - 56, 336);
+  const int qrDrawX = cardX + (cardW - qrSize) / 2;
+  const int qrDrawY = qrY + 28;
   M5.Display.fillRect(qrDrawX, qrDrawY, qrSize, qrSize, TFT_WHITE);
   M5.Display.qrcode(REPOSITORY_URL, qrDrawX, qrDrawY, qrSize, 6);
-  const int hintX = qrDrawX + qrSize + 18;
-  const int hintW = cardX + cardW - 22 - hintX;
-  M5.Display.drawRect(hintX - 8, qrDrawY, hintW + 16, qrSize, TFT_BLACK);
-  drawUiTextLeft(ui_text::kRepoUrlLabel, hintX, qrDrawY + 18, uiSmallFont());
-  drawUiTextMultilineLeft(ui_text::kQrScanHint, hintX, qrDrawY + 56, uiBodyFont(), 8);
-  drawUiTextLeft("github.com/omiya-bonsai", hintX, qrDrawY + 148, uiSmallFont());
-  drawUiTextLeft("/m5papers3-weather-learning-system", hintX, qrDrawY + 178, uiSmallFont());
-
-  drawCard(cardX, urlY, cardW, urlH, ui_text::kRepoUrlLabel);
-  drawUiTextLeft("github.com/omiya-bonsai", cardX + 16, urlY + 40, uiBodyFont());
-  drawUiTextLeft("/m5papers3-weather-learning-system", cardX + 16, urlY + 74, uiBodyFont());
-  drawUiTextMultilineCenter(ui_text::kAuxHint, M5.Display.width() / 2, hintY - 6, uiSmallFont(), 2);
 }
 
 epd_mode_t desiredEpdModeForSlide(uint8_t slideIndex) {
