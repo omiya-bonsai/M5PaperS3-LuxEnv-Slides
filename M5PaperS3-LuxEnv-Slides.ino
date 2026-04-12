@@ -27,7 +27,8 @@
 // ============================================================
 
 // ---------------------- MQTT topics --------------------------
-static constexpr const char* TOPIC_ENV4        = "env4";
+// static constexpr const char* TOPIC_ENV4        = "env4";
+static constexpr const char* TOPIC_ENV4        = "home/env/env4/raw";
 static constexpr const char* TOPIC_ENV4_STATUS = "home/env/env4/status";
 static constexpr const char* TOPIC_LUX_RAW     = "home/env/lux/raw";
 static constexpr const char* TOPIC_LUX_META    = "home/env/lux/meta";
